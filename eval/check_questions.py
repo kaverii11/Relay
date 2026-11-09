@@ -13,7 +13,8 @@ Columns (K, 2026-11-10):
                  The cutoff is tuned on this column, not on answerable.
   expected_answer, must_include, paper, page   required when answerable = yes
   must_include   the fact(s) a correct answer needs (a number with its unit, or a mechanism's name);
-                 several facts: separate with ";" (each is checked on its own)
+                 several facts: separate with ";" (each is checked on its own;
+                 a piece starting with "not"/"no", e.g. "not reported", is a grading note and isn't looked up)
   paper          arXiv id, with or without version or ".pdf" (1706.03762, 1706.03762v7, 2410.00037v1.pdf)
   section        as in the paper, e.g. "3.2.2", "3.2.1 Architecture", "Appendix D" (recommended)
   page           PDF page number, or a range 4-5
@@ -85,6 +86,8 @@ def parse_pages(s):
 def check_facts(r, v, pg, txt, W):
     """must_include may hold several facts separated by ';'. Each is looked for on the cited page(s)."""
     facts = [x.strip() for x in r["must_include"].split(";") if x.strip()]
+    # "not reported", "no wall-clock comparison": grading notes about what's MISSING, not page facts
+    facts = [x for x in facts if not re.match(r"(?i)(not|no)\b", x)]
     for mi in facts:
         k = match_key(mi)
         if len(k) < MIN_KEY:
