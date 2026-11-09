@@ -48,7 +48,8 @@ def lower_first(q):
 
 
 def items(pool, n_probe, seed):
-    out = [{"id": p["id"], "kind": "k", "set": p["set"], "answerable": p["ans"], "q": p["q"]} for p in pool]
+    out = [{"id": p["id"], "kind": "k", "set": p["set"], "type": p.get("type", ""), "answerable": p["ans"], "q": p["q"]}
+           for p in pool]
     picks = random.Random(seed).sample(pool, min(n_probe, len(pool)))
     for i, (p, fr) in enumerate(zip(picks, FRAMINGS)):
         out.append({"id": f"wp{i}_{p['id']}", "kind": "wording_probe", "parent_id": p["id"], "set": "wording_probe",

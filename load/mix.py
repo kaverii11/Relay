@@ -3,8 +3,9 @@
 K (DECISIONS §22): pool = K's eval + tuning questions; X% unanswerable; the burst has Y% exact
 repeats; question rates are chosen so DRAFT demand = k x measured ceiling (both rates reported).
 
-K's questions: eval/k_questions.csv, columns  id,set,question,answerable
-  set = eval | tuning;  answerable = yes | no  (by the three papers)
+K's questions: eval/k_questions.csv, columns (K, 2026-11-10)
+  id,set,type,question,answerable,expected_answer,must_include,paper,section,page,searched_terms
+  set = eval | tuning;  answerable = yes | no  (by the three papers). Full check: eval/check_questions.py
 Variants (K §23): eval/variants_assistant.csv, columns  id,parent_id,question,answerable,author
   Rewordings of K's questions written by the assistant (author=assistant), so long scenarios
   don't run out of questions and turn into exact-match cache hits. LOAD POOL ONLY: never used
@@ -38,12 +39,17 @@ MIX_PATH = ROOT / "load/mix.json"
 
 def load_pool(path: Path | None = None):
     path = path or POOL_PATH
-    rows = list(csv.DictReader(open(path)))
+    rows = list(csv.DictReader(open(path, newline="", encoding="utf-8-sig")))
+    need = {"id", "set", "question", "answerable"}
+    if rows and not need <= set(rows[0]):
+        raise SystemExit(f"{path}: needs columns {sorted(need)}; run eval/check_questions.py")
     bad = [r for r in rows if r["answerable"].strip().lower() not in ("yes", "no")]
     if bad:
         raise SystemExit(f"{path}: answerable must be yes/no, bad rows: {[r['id'] for r in bad]}")
-    return [{"id": r["id"], "set": r["set"], "q": r["question"].strip(),
-             "ans": r["answerable"].strip().lower() == "yes"} for r in rows]
+    # extra columns (type, expected_answer, must_include, ...) are kept under "meta" for grading
+    return [{"id": r["id"].strip(), "set": r["set"].strip(), "q": r["question"].strip(),
+             "ans": r["answerable"].strip().lower() == "yes", "type": (r.get("type") or "").strip(),
+             "meta": {k: (v or "").strip() for k, v in r.items() if k not in need}} for r in rows]
 
 
 def load_variants(path: Path | None = None, parents=None):
