@@ -47,6 +47,9 @@ class Policy:
     workers: int = 16                      # our own concurrency; arrivals beyond this queue
     reasoning_effort: str = "low"          # K §15
     cache: bool = True
+    # --- arrival-time busy check (K, DECISIONS §21): "on" | "shadow" (log decision, admit all) | "off"
+    arrival_check: str = "on"
+    learn_limits: bool = True              # K: lower our limit from a 429 body, drift back over ~10 min
     extra: dict = field(default_factory=dict)
 
     def as_dict(self):

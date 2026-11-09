@@ -71,6 +71,8 @@ def main():
     ap.add_argument("--no-retry-budget", action="store_true")
     ap.add_argument("--max-minutes", type=float, default=None, help="truncate the schedule (smoke tests)")
     ap.add_argument("--tag", default="")
+    ap.add_argument("--arrival-check", default="on", choices=["on", "shadow", "off"])
+    ap.add_argument("--no-learn", action="store_true", help="don't learn lower limits from 429 bodies")
     a = ap.parse_args()
 
     sc = SCENARIOS[a.scenario]
@@ -90,7 +92,7 @@ def main():
     for ex in sc.get("exhaust", []):
         httpx.post(admin + "/exhaust", json=ex).raise_for_status()
 
-    pol = Policy(retry_jitter=a.jitter)
+    pol = Policy(retry_jitter=a.jitter, arrival_check=a.arrival_check, learn_limits=not a.no_learn)
     if a.max_retries is not None:
         pol.max_retries_per_question = a.max_retries
     if a.no_retry_budget:

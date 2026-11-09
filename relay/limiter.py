@@ -15,9 +15,26 @@ WINDOWS = {"rpm": 60, "itpm": 60, "tpm": 60, "rpd": 86400, "tpd": 86400}
 DEFAULT_LIMITS = {"rpm": 30, "itpm": 7000, "tpm": 8000, "rpd": 1000, "tpd": 200000}
 
 
+LEARN_DRIFT_S = 600   # K: a learned (lower) limit drifts back to the measured one over ~10 min
+
+
 class _Bucket:
     def __init__(self, limit, window):
-        self.limit, self.window, self.used, self.t = float(limit), float(window), 0.0, time.monotonic()
+        self.base, self.window, self.used, self.t = float(limit), float(window), 0.0, time.monotonic()
+        self.learned, self.learned_t = None, None
+
+    @property
+    def limit(self):
+        """Measured limit, unless a 429 told us a lower one. The learned value drifts linearly back to
+        the measured one over LEARN_DRIFT_S: nothing else would ever raise it (ITPM 7000 is not in
+        the headers), and another 429 simply re-learns it."""
+        if self.learned is None:
+            return self.base
+        f = min(1.0, (time.monotonic() - self.learned_t) / LEARN_DRIFT_S)
+        if f >= 1.0:
+            self.learned = None
+            return self.base
+        return self.learned + (self.base - self.learned) * f
 
     def _refill(self):
         now = time.monotonic()
@@ -40,6 +57,25 @@ class Limiter:
         lim = {**DEFAULT_LIMITS, **(limits or {})}
         self.b = {m: {k: _Bucket(lim[k], WINDOWS[k]) for k in WINDOWS} for m in models}
         self.recent = deque()        # (t, is_retry) over the last 60 s, for the shared retry budget
+
+    def learn(self, model, kind, limit_value) -> bool:
+        """Lower our limit to what a 429 body said ('Limit 3500'). Returns True if it changed."""
+        with self.lock:
+            bk = self.b[model].get(kind)
+            if bk is None or limit_value >= bk.base:
+                return False
+            bk._refill()
+            bk.learned, bk.learned_t = float(limit_value), time.monotonic()
+            return True
+
+    def peek_wait(self, model, tokens_in, tokens_out_est, ahead_tokens=0.0) -> tuple[float, str]:
+        """Like predict_wait_s but with `ahead_tokens` of not-yet-reserved drafts queued in front."""
+        need = {"rpm": 1, "rpd": 1, "itpm": tokens_in + ahead_tokens,
+                "tpm": tokens_in + tokens_out_est + ahead_tokens, "tpd": tokens_in + tokens_out_est}
+        with self.lock:
+            waits = {k: self.b[model][k].wait_for(r) for k, r in need.items()}
+        k = max(waits, key=waits.get)
+        return waits[k], k
 
     def predict_wait_s(self, model, tokens_in, tokens_out_est=0) -> tuple[float, str]:
         """Seconds until this call would be admitted, and which limit binds."""

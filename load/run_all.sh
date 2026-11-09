@@ -11,4 +11,7 @@ sleep 4
 run() { echo "=== $(date '+%H:%M:%S') $*"; caffeinate -i $PY load/loadgen.py "$@" || echo "FAILED: $*"; }
 for sc in steady burst overload minute_limit_halved daily_exhausted; do run $sc --rare 0.05; done
 for r in 0.02 0.10; do run burst --rare $r; run overload --rare $r; done
+# K: shadow-mode arrival check (measures false-busy) and halved limit without 429 learning
+run overload --rare 0.05 --arrival-check shadow --tag shadow
+run minute_limit_halved --rare 0.05 --no-learn --tag nolearn
 echo "=== $(date '+%H:%M:%S') all done"

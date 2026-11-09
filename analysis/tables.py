@@ -9,9 +9,10 @@ Definitions (DECISIONS §5, §7, K's percentile rule):
 - Total time: time until the person has the complete reply; no answer -> +infinity (same rule).
 - Offered rate: requests / (last start_time - first start_time) * 60.
 - Duration: last (start_time + total_ms) - first start_time.
-- Peak queue length: max overlap of queue intervals. A request is queued from start_time
-  until start_time + service_start_ms (first model call sent, or cache answered), or, if
-  service_start_ms is blank (never served), until start_time + total_ms.
+- Peak queue length (= peak WAITING, K): max overlap of waiting intervals. Each request waits
+  (1) from start_time until start_time + service_start_ms (first model call sent, or cache
+  answered), or until start_time + total_ms if never served; and (2) from draft_ready_ms to
+  draft_sent_ms (waiting for the 120b slot) when it reached the draft.
 - Tokens per answer: all tokens spent in the scenario (in + out, including failed requests)
   divided by the number of status=ok rows. Waste counts against the answers that got through.
 - Cost per 1,000 answers: $0 actually billed (free tier), and the cost at Groq's paid on-demand
@@ -76,6 +77,8 @@ def peak_queue(rows):
         t = dt.datetime.fromisoformat(r["start_time"]).timestamp() * 1000
         end = t + (f(r["service_start_ms"]) if f(r["service_start_ms"]) is not None else f(r["total_ms"]))
         ev += [(t, 1), (end, -1)]
+        if f(r.get("draft_ready_ms")) is not None and f(r.get("draft_sent_ms")) is not None:
+            ev += [(t + f(r["draft_ready_ms"]), 1), (t + f(r["draft_sent_ms"]), -1)]
     ev.sort(key=lambda e: (e[0], e[1]))       # leave (-1) before arrive (+1) at the same instant
     cur = peak = 0
     for _, d in ev:

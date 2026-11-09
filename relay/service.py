@@ -21,7 +21,8 @@ COLUMNS = ["request_id", "scenario", "source", "start_time", "first_token_ms", "
            # extras, after the brief's 12 (DECISIONS §5)
            "service_start_ms", "gave_up", "degrade_level", "model", "calls",
            "tokens_in_120b", "tokens_out_120b", "tokens_in_20b", "tokens_out_20b", "rerank_ms",
-           "reply_kind"]   # answer | refusal | busy | none (gave up / error); cache hits keep their kind
+           "reply_kind",   # answer | refusal | busy | none (gave up / error); cache hits keep their kind
+           "draft_ready_ms", "draft_sent_ms", "arrival_pred_draft_sent_ms", "arrival_busy_pred", "busy_path"]
 
 
 class Service:
@@ -55,7 +56,7 @@ class Service:
                 ctx.ev("gave_up_in_queue")
                 res = self.pl._finish(ctx, {"degrade_level": "none", "model": ""}, "timeout", gave_up=True)
             elif ctx.ms() > ctx.deadline_ms:          # waited past the deadline: busy, not served
-                res = self.pl._busy(ctx, {"degrade_level": "none", "model": ""}, "queue", 5.0)
+                res = self.pl._busy(ctx, {"degrade_level": "none", "model": ""}, "queue", 5.0, path="queue")
             else:
                 ctx.ev("dequeued")
                 res = self.pl.run(ctx)
@@ -79,7 +80,9 @@ class Service:
                "tokens_in_20b": res.get("by_model", {}).get("openai/gpt-oss-20b", [0, 0])[0],
                "tokens_out_20b": res.get("by_model", {}).get("openai/gpt-oss-20b", [0, 0])[1],
                "rerank_ms": res.get("rerank_ms"),
-               "reply_kind": res.get("kind") or "none"}
+               "reply_kind": res.get("kind") or "none",
+               **{k: res.get(k) for k in ("draft_ready_ms", "draft_sent_ms", "arrival_pred_draft_sent_ms",
+                                          "arrival_busy_pred", "busy_path")}}
         detail = {k: v for k, v in res.items() if k != "events"}
         with self.lock:
             self.rows.append(row)

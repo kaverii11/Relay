@@ -33,6 +33,7 @@ from relay.textnorm import match_key, quote_in
 DRAFT_OUT_EST = 350      # tokens; real 120b drafts averaged 258 out (stage 2a), padded for safety
 SHORT_OUT_EST = 120      # understand/check; real 20b understand averaged 98 out
 EXPECTED_WORK_MS = {"draft": 1100, "check": 550}   # unloaded medians, stage 2a (draft total, 20b short total)
+EXPECTED_PRE_DRAFT_MS = 750   # understand (20b total p50 536, stage 2a) + retrieve (~200 ms cross-encoder)
 
 
 class Cancelled(Exception):
@@ -114,6 +115,11 @@ class Ctx:
     service_start_ms: float | None = None   # first model call SENT (or cache answered); None = never served
     by_model: dict = field(default_factory=dict)   # model -> [tokens_in, tokens_out] (out includes reasoning)
     rerank_ms: float | None = None
+    draft_ready_ms: float | None = None      # first draft: prompt built, asking the limiter for a slot
+    draft_sent_ms: float | None = None       # first draft: request actually sent
+    arrival_pred_draft_sent_ms: float | None = None
+    arrival_busy_pred: int | None = None     # 1 = the arrival check said busy (acted on, or shadow only)
+    busy_path: str = ""                      # arrival | mid | queue
     tokens_in: int = 0
     tokens_out: int = 0
     events: list = field(default_factory=list)
@@ -140,6 +146,17 @@ class Pipeline:
         self.base_url, self.api_key, self.source = base_url, api_key, source
         self.setting, self.p, self.lim, self.cache, self.ret = setting, policy, limiter, cache, retriever
         self.http = httpx.Client(timeout=None, limits=httpx.Limits(max_connections=200, max_keepalive_connections=50))
+        # Requests that will need a draft but haven't reserved it yet (K: a SET of ids, not a counter,
+        # so it can't drift and can be inspected). Added at arrival, removed when the draft is
+        # reserved or in `finally`.
+        self.queued_drafts: set[str] = set()
+        self.qlock = threading.Lock()
+        chunk_tok = [len(c.text) // 4 + 12 for c in retriever.chunks]          # +12: the citation header
+        self.mean_chunk_tok = sum(chunk_tok) / len(chunk_tok)
+        self.draft_overhead_tok = len(draft_messages("x" * 80, [])[0]["content"]) // 4 + 30
+
+    def draft_est(self, k):
+        return self.draft_overhead_tok + k * self.mean_chunk_tok
 
     # ------------------------------------------------------------------ model calls + retry policy
     def call_model(self, ctx: Ctx, model, messages, kind, effort=None, out_est=SHORT_OUT_EST):
@@ -150,6 +167,8 @@ class Pipeline:
                 raise Cancelled()
             left_ms = ctx.deadline_ms - ctx.ms()
             max_wait = max(0.0, (left_ms - EXPECTED_WORK_MS.get(kind, 550)) / 1000)
+            if kind == "draft" and ctx.draft_ready_ms is None:
+                ctx.draft_ready_ms = ctx.ms()
             wait, binding, ok = self.lim.acquire(model, n_in, out_est, max_wait)
             if not ok:
                 if binding in ("rpd", "tpd"):
@@ -157,7 +176,12 @@ class Pipeline:
                 raise Busy(binding, wait)
             # planned wait for the slot our limiter reserved; +50 ms because arriving exactly on the
             # refill boundary still got a 429 in the smoke test (float edge, no network slack locally)
+            if kind == "draft":
+                with self.qlock:
+                    self.queued_drafts.discard(ctx.rid)    # its tokens now live in the limiter's buckets
             ctx.sleep(wait + 0.05 if wait > 0 else 0, "waiting")
+            if kind == "draft" and ctx.draft_sent_ms is None:
+                ctx.draft_sent_ms = ctx.ms()
             self.lim.note_request(is_retry=attempt > 0)
             ctx.calls += 1
             if ctx.service_start_ms is None:
@@ -184,6 +208,10 @@ class Pipeline:
             if r.status == 200 and not r.error_kind:
                 return r
             # ---- failure: decide whether to retry
+            if r.status == 429 and self.p.learn_limits:
+                m = re.search(r"Limit (\d+)", r.error_body or "")
+                if m and self.lim.learn(model, lk, int(m.group(1))):
+                    ctx.ev("limit_learned", model=model, limit=lk, value=int(m.group(1)))
             if r.status == 429 and lk in ("rpd", "tpd"):
                 raise DailyLimit(model, lk)               # never retry a per-day limit
             retryable = r.status == 429 or r.status >= 500 or r.error_kind in ("network", "truncated") \
@@ -215,6 +243,14 @@ class Pipeline:
                     ctx.service_start_ms = ctx.ms()
                     out.update(hit, degrade_level="cache")
                     return self._deliver(ctx, out, "ok")
+
+            # arrival check (K, B): would even the CHEAPEST ladder rung miss the deadline?
+            if self.p.arrival_check != "off":
+                busy, eta_s, kind_ = self._arrival_predict(ctx)
+                if busy and self.p.arrival_check == "on":
+                    return self._busy(ctx, out, kind_, eta_s, path="arrival")
+            with self.qlock:
+                self.queued_drafts.add(ctx.rid)
 
             # [1] understand: rewrite query. If it can't run, the raw question still works as a query.
             query, hints = ctx.question, {}
@@ -293,8 +329,41 @@ class Pipeline:
         except CallFailed as e:
             ctx.ev("failed", why=str(e))
             return self._finish(ctx, out, "error")
+        finally:
+            with self.qlock:
+                self.queued_drafts.discard(ctx.rid)
 
     # ------------------------------------------------------------------ decide helpers
+    def _arrival_predict(self, ctx):
+        """Predict when this request's draft could be sent, using the measured refill formula,
+        the limiter's current buckets, and every not-yet-reserved draft queued ahead (each at the
+        full-rung size: pessimistic, since some will be cache hits or refusals). Busy only if the
+        cheapest rung misses the deadline (K). Logged in both 'on' and 'shadow' modes."""
+        with self.qlock:
+            ahead = len(self.queued_drafts - {ctx.rid})
+        k_full, k_less = self.setting.k, max(2, self.setting.k // 2)
+        best = None
+        for model, k, level in [(BIG, k_full, "full"), (BIG, k_less, "fewer_chunks"), (SMALL, k_less, "small_model")]:
+            if model == BIG and self.lim.daily_fraction_left(BIG) < self.p.daily_reserve_fraction:
+                continue
+            ahead_tok = ahead * self.draft_est(k_full) if model == BIG else 0.0
+            wait, binding = self.lim.peek_wait(model, self.draft_est(k), DRAFT_OUT_EST, ahead_tok)
+            if binding in ("rpd", "tpd") and wait > 0:
+                continue
+            sent_ms = ctx.ms() + max(EXPECTED_PRE_DRAFT_MS, wait * 1000)   # from NOW (may have queued already)
+            if best is None or sent_ms < best[0]:
+                best = (sent_ms, wait, binding, level)
+        if best is None:                                  # every rung blocked by a daily limit
+            ctx.arrival_busy_pred, ctx.arrival_pred_draft_sent_ms = 1, None
+            ctx.ev("arrival_check", busy=True, why="daily", ahead=ahead, mode=self.p.arrival_check)
+            return True, self._daily_eta(BIG), "tpd"
+        sent_ms, wait, binding, level = best
+        busy = sent_ms + EXPECTED_WORK_MS["draft"] + EXPECTED_WORK_MS["check"] > ctx.deadline_ms
+        ctx.arrival_busy_pred, ctx.arrival_pred_draft_sent_ms = int(busy), round(sent_ms, 1)
+        ctx.ev("arrival_check", busy=busy, ahead=ahead, rung=level, pred_draft_sent_ms=round(sent_ms, 1),
+               binding=binding, mode=self.p.arrival_check)
+        return busy, wait, binding
+
     def _plan_draft(self, ctx, query, hits):
         k_full, k_less = self.setting.k, max(2, self.setting.k // 2)
         rungs = [(BIG, k_full, "full"), (BIG, k_less, "fewer_chunks"), (SMALL, k_less, "small_model")]
@@ -368,7 +437,8 @@ class Pipeline:
                            {k: out[k] for k in ("answer", "citations", "kind", "query", "gate")})
         return self._deliver(ctx, out, "ok")
 
-    def _busy(self, ctx, out, limit_kind, eta_s):
+    def _busy(self, ctx, out, limit_kind, eta_s, path="mid"):
+        ctx.busy_path = path
         eta = "under a minute" if eta_s < 60 else (f"about {math.ceil(eta_s / 60)} min" if eta_s < 3600
                                                     else f"about {eta_s / 3600:.1f} h")
         at = (dt.datetime.now() + dt.timedelta(seconds=eta_s)).strftime("%H:%M")
@@ -378,7 +448,7 @@ class Pipeline:
             f"Capacity for a question like yours should be back in {eta} (around {at}). "
             "I won't send an unchecked answer instead. Please ask again then."), busy_limit=limit_kind,
             eta_s=round(eta_s, 1))
-        ctx.ev("busy", limit=limit_kind, eta_s=round(eta_s, 1))
+        ctx.ev("busy", limit=limit_kind, eta_s=round(eta_s, 1), path=path)
         return self._finish(ctx, out, "rate_limited", first_token=False)
 
     def _deliver(self, ctx, out, status):
@@ -391,4 +461,7 @@ class Pipeline:
                 "total_ms": round(t, 1), "gave_up": int(gave_up), "retries": ctx.retries, "calls": ctx.calls,
                 "tokens_in": ctx.tokens_in, "tokens_out": ctx.tokens_out, "events": ctx.events,
                 "service_start_ms": None if ctx.service_start_ms is None else round(ctx.service_start_ms, 1),
-                "by_model": ctx.by_model, "rerank_ms": ctx.rerank_ms}
+                "by_model": ctx.by_model, "rerank_ms": ctx.rerank_ms,
+                **{k: (None if getattr(ctx, k) is None else (round(getattr(ctx, k), 1) if isinstance(getattr(ctx, k), float) else getattr(ctx, k)))
+                   for k in ("draft_ready_ms", "draft_sent_ms", "arrival_pred_draft_sent_ms", "arrival_busy_pred")},
+                "busy_path": ctx.busy_path}
