@@ -107,6 +107,7 @@ def main():
             b.used = b.limit - st[m]["tpd"]
     ret = Retriever(setting)
     cross_encoder()
+    ret.search("warm-up query about attention heads")   # first inference is ~4x slower (723 vs 181 ms, smoke run)
     pl = Pipeline(base_url=f"http://127.0.0.1:{a.port}/v1", api_key="standin", source="stand-in",
                   setting=setting, policy=pol, limiter=lim, cache=ExactCache(), retriever=ret)
     svc = Service(pl, workers=pol.workers, scenario=a.scenario, events_path=ROOT / f"raw/events_{run}.jsonl")

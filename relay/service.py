@@ -19,7 +19,8 @@ from relay.pipeline import Ctx, Pipeline
 COLUMNS = ["request_id", "scenario", "source", "start_time", "first_token_ms", "total_ms", "status",
            "retries", "tokens_in", "tokens_out", "retrieval_setting", "answer_grade",
            # extras, after the brief's 12 (DECISIONS §5)
-           "service_start_ms", "gave_up", "degrade_level", "model", "calls"]
+           "service_start_ms", "gave_up", "degrade_level", "model", "calls",
+           "tokens_in_120b", "tokens_out_120b", "tokens_in_20b", "tokens_out_20b", "rerank_ms"]
 
 
 class Service:
@@ -71,7 +72,12 @@ class Service:
                "retrieval_setting": self.pl.setting.name, "answer_grade": "",
                "service_start_ms": res.get("service_start_ms"),
                "gave_up": res["gave_up"], "degrade_level": res.get("degrade_level", ""),
-               "model": res.get("model", ""), "calls": res["calls"]}
+               "model": res.get("model", ""), "calls": res["calls"],
+               "tokens_in_120b": res.get("by_model", {}).get("openai/gpt-oss-120b", [0, 0])[0],
+               "tokens_out_120b": res.get("by_model", {}).get("openai/gpt-oss-120b", [0, 0])[1],
+               "tokens_in_20b": res.get("by_model", {}).get("openai/gpt-oss-20b", [0, 0])[0],
+               "tokens_out_20b": res.get("by_model", {}).get("openai/gpt-oss-20b", [0, 0])[1],
+               "rerank_ms": res.get("rerank_ms")}
         detail = {k: v for k, v in res.items() if k != "events"}
         with self.lock:
             self.rows.append(row)

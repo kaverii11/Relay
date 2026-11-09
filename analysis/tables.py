@@ -14,6 +14,12 @@ Definitions (DECISIONS §5, §7, K's percentile rule):
   service_start_ms is blank (never served), until start_time + total_ms.
 - Tokens per answer: all tokens spent in the scenario (in + out, including failed requests)
   divided by the number of status=ok rows. Waste counts against the answers that got through.
+- Cost per 1,000 answers: $0 actually billed (free tier), and the cost at Groq's paid on-demand
+  prices (PRICES below, from the model pages, fetched 2026-11-09). All tokens spent in the
+  scenario (incl. failed requests) / successful (status=ok) answers x 1000. Output tokens include
+  reasoning tokens (Groq reports reasoning inside completion_tokens; billed as output, K's rule).
+  Cached input is priced at the full input rate (we don't record cache hits per call), so the
+  paid figure slightly overstates real Groq.
 """
 from __future__ import annotations
 
@@ -25,6 +31,14 @@ from collections import defaultdict
 import numpy as np
 
 INF = float("inf")
+# USD per 1M tokens, on-demand. console.groq.com/docs/model/openai/gpt-oss-120b and .../gpt-oss-20b,
+# fetched 2026-11-09 (no date shown on the pages). Cached input ($0.075 / $0.037) not used.
+PRICES = {"120b": {"in": 0.15, "out": 0.60}, "20b": {"in": 0.075, "out": 0.30}}
+
+
+def paid_cost(rs):
+    return sum(int(r[f"tokens_in_{m}"]) * PRICES[m]["in"] + int(r[f"tokens_out_{m}"]) * PRICES[m]["out"]
+               for r in rs for m in PRICES) / 1e6
 
 
 def f(x):
@@ -97,8 +111,9 @@ def main(path):
         ok = sum(r["status"] == "ok" for r in rs)
         toks = sum(int(r["tokens_in"]) + int(r["tokens_out"]) for r in rs)
         tpa = f"{toks / ok:.0f}" if ok else "no answers"
+        cost = f"$0 billed (free tier); ${paid_cost(rs) / ok * 1000:.3f} at paid on-demand" if ok else "no answers"
         print(f"| {sc} ({src}) | {pc('ok'):.1f} | {pc('rate_limited'):.1f} | {pc('timeout'):.1f} | {pc('error'):.1f} | "
-              f"{np.mean([int(r['retries']) for r in rs]):.2f} | {peak_queue(rs)} | {tpa} | not measured (pricing TBD) |")
+              f"{np.mean([int(r['retries']) for r in rs]):.2f} | {peak_queue(rs)} | {tpa} | {cost} |")
 
     graded = [r for r in rows if r["answer_grade"]]
     if graded:

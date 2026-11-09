@@ -112,6 +112,8 @@ class Ctx:
     retries: int = 0
     calls: int = 0
     service_start_ms: float | None = None   # first model call SENT (or cache answered); None = never served
+    by_model: dict = field(default_factory=dict)   # model -> [tokens_in, tokens_out] (out includes reasoning)
+    rerank_ms: float | None = None
     tokens_in: int = 0
     tokens_out: int = 0
     events: list = field(default_factory=list)
@@ -170,7 +172,10 @@ class Pipeline:
             self.lim.sync(model, r.headers)
             self.lim.settle(model, out_est, r.tokens_out)
             ctx.tokens_in += r.tokens_in
-            ctx.tokens_out += r.tokens_out
+            ctx.tokens_out += r.tokens_out          # completion_tokens: reasoning is inside it (measured, stage 1)
+            mt = ctx.by_model.setdefault(model, [0, 0])
+            mt[0] += r.tokens_in
+            mt[1] += r.tokens_out
             lk = limit_kind(r.error_body) if r.status == 429 else ""
             ctx.ev("call_end", step=kind, model=model, attempt=attempt, status=r.status,
                    err=r.error_kind, limit=lk, first_any_ms=r.first_any_ms, ttft_ms=r.ttft_ms,
@@ -226,6 +231,7 @@ class Pipeline:
             # [2] retrieve (tool)
             hits, gate, tms = self.ret.search(query)
             out["gate"] = round(gate, 3)
+            ctx.rerank_ms = round(tms["ce_ms"], 1)
             ctx.ev("retrieve", **{k: round(v, 1) for k, v in tms.items()}, gate=round(gate, 3),
                    hits=[h.chunk.cite() for h in hits])
 
@@ -384,4 +390,5 @@ class Pipeline:
         return {**out, "status": status, "first_token_ms": round(t, 1) if first_token else None,
                 "total_ms": round(t, 1), "gave_up": int(gave_up), "retries": ctx.retries, "calls": ctx.calls,
                 "tokens_in": ctx.tokens_in, "tokens_out": ctx.tokens_out, "events": ctx.events,
-                "service_start_ms": None if ctx.service_start_ms is None else round(ctx.service_start_ms, 1)}
+                "service_start_ms": None if ctx.service_start_ms is None else round(ctx.service_start_ms, 1),
+                "by_model": ctx.by_model, "rerank_ms": ctx.rerank_ms}
