@@ -125,6 +125,21 @@ def main(path):
         print(f"| {sc} ({src}) | {pc('ok'):.1f} | {pc('rate_limited'):.1f} | {pc('timeout'):.1f} | {pc('error'):.1f} | "
               f"{np.mean([int(r['retries']) for r in rs]):.2f} | {peak_queue(rs)} | {tpa} | {cost} |")
 
+    print("\nLoad mix (extra, K §22): question rate vs draft demand, from results.csv")
+    print("| Scenario | Questions/min | Drafts/min (reached the draft) | Drafts / ceiling (2.5) | "
+          "Refusals % (fresh) | Cache hits % | Busy % |")
+    print("|---|---|---|---|---|---|---|")
+    for (sc, src, st), rs in sorted(by.items()):
+        starts = sorted(dt.datetime.fromisoformat(r["start_time"]).timestamp() for r in rs)
+        span = (starts[-1] - starts[0]) / 60 if len(rs) > 1 else float("nan")
+        n = len(rs)
+        drafts = sum(f(r.get("draft_ready_ms")) is not None for r in rs)
+        cache = sum(r["degrade_level"] == "cache" for r in rs)
+        fresh_ref = sum(r["reply_kind"] == "refusal" and r["degrade_level"] != "cache" for r in rs)
+        busy = sum(r["reply_kind"] == "busy" for r in rs)
+        print(f"| {sc} ({src}) | {n / span:.2f} | {drafts / span:.2f} | {drafts / span / 2.5:.2f}x | "
+              f"{100 * fresh_ref / n:.1f} | {100 * cache / n:.1f} | {100 * busy / n:.1f} |")
+
     graded = [r for r in rows if r["answer_grade"]]
     if graded:
         print("\nTable 3: retrieval settings (real Groq, graded rows only)")

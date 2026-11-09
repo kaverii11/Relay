@@ -9,3 +9,5 @@ probe/raw/
 raw/
 data/
 .DS_Store
+eval/k_questions.csv
+load/mix.json

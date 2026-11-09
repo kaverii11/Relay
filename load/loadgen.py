@@ -1,6 +1,6 @@
 """Run one load scenario against the stand-in (or, at small scale, real Groq).
 
-  .venv/bin/python load/loadgen.py steady --port 8099 --rare 0.05 [--time-scale 1] [--seed 1]
+  .venv/bin/python load/loadgen.py steady --port 8099 --rare 0.05 [--seed 1] [--smoke --draft-share 0.6]
 
 Open-loop: the full arrival schedule is drawn up front from a seeded RNG and saved to
 raw/, then each question is submitted at its arrival time whether or not earlier ones
@@ -24,7 +24,8 @@ sys.path.insert(0, str(ROOT))
 
 from eval.latency_questions import QUESTIONS  # noqa: E402
 from eval.seed_questions import SEED  # noqa: E402
-from load.scenarios import CEILING_PER_MIN, PATIENCE, SCENARIOS  # noqa: E402
+from load.mix import MIX_PATH, POOL_PATH, Sampler, draft_share, load_pool  # noqa: E402
+from load.scenarios import CEILING_PER_MIN, MIX, PATIENCE, SCENARIOS  # noqa: E402
 from relay.config import BIG, SETTINGS, SMALL, Policy  # noqa: E402
 from relay.limiter import Limiter  # noqa: E402
 from relay.pipeline import ExactCache, Pipeline  # noqa: E402
@@ -34,28 +35,37 @@ from relay.service import Service, write_csv  # noqa: E402
 POOL = QUESTIONS + [q for q, _ in SEED]
 
 
-def schedule(sc, rng, max_minutes=None):
-    """List of (t_seconds, question, patience_s). Poisson phases + bursts."""
+def schedule(sc, rng, draft_share, sampler=None, repeat_share=0.0, max_minutes=None):
+    """List of (t_seconds, question, patience_s, kind). kind = fresh | burst | burst_repeat | smoke.
+    Poisson phases at QUESTION rate = draft_mult x ceiling / draft_share, plus bursts."""
     arr, t0 = [], 0.0
     for ph in sc["phases"]:
-        lam = ph["rate_mult"] * CEILING_PER_MIN / 60.0        # per second
+        lam = ph["draft_mult"] * CEILING_PER_MIN / draft_share / 60.0     # questions per second
         end = t0 + ph["minutes"] * 60
         t = t0
         while True:
             t += rng.expovariate(lam)
             if t >= end:
                 break
-            arr.append(t)
+            arr.append((t, None))
         t0 = end
-    for b in sc.get("bursts", []):
-        arr += [b["at_min"] * 60 + rng.uniform(0, b["within_s"]) for _ in range(b["n"])]
+    for bi, b in enumerate(sc.get("bursts", [])):
+        arr += [(b["at_min"] * 60 + rng.uniform(0, b["within_s"]), bi) for _ in range(b["n"])]
     arr.sort()
     if max_minutes:
-        arr = [a for a in arr if a < max_minutes * 60]
-    out = []
-    for a in arr:
+        arr = [a for a in arr if a[0] < max_minutes * 60]
+    out, in_burst = [], {}
+    for a, bi in arr:
         pat = PATIENCE["median_s"] * math.exp(rng.gauss(0, PATIENCE["sigma"]))
-        out.append((a, rng.choice(POOL), pat))
+        if sampler is None:                     # smoke: old CC-written pool, with replacement
+            out.append((a, rng.choice(POOL), pat, "smoke"))
+        elif bi is None:
+            out.append((a, sampler.fresh()["q"], pat, "fresh"))
+        else:
+            asked = in_burst.setdefault(bi, [])
+            p, rep = sampler.burst(asked, repeat_share)
+            asked.append(p)
+            out.append((a, p["q"], pat, "burst_repeat" if rep else "burst"))
     return out
 
 
@@ -73,11 +83,35 @@ def main():
     ap.add_argument("--tag", default="")
     ap.add_argument("--arrival-check", default="on", choices=["on", "shadow", "off"])
     ap.add_argument("--no-learn", action="store_true", help="don't learn lower limits from 429 bodies")
+    ap.add_argument("--smoke", action="store_true",
+                    help="old CC-written pool sampled with replacement, draft_share from --draft-share (default 1)")
+    ap.add_argument("--draft-share", type=float, default=None, help="override load/mix.json (smoke only)")
     a = ap.parse_args()
 
     sc = SCENARIOS[a.scenario]
     rng = random.Random(a.seed)
-    sched = schedule(sc, rng, a.max_minutes)
+    setting = SETTINGS[a.setting]
+    x, y = MIX["unanswerable_share"], MIX["burst_repeat_share"]
+    if a.smoke:
+        ds, sampler, mixinfo = a.draft_share or 1.0, None, {"mode": "smoke"}
+    else:
+        if x is None or y is None:
+            sys.exit("MIX X / Y not set by K (load/scenarios.py, DECISIONS §22); use --smoke for a smoke test")
+        mix = json.loads(MIX_PATH.read_text())[setting.name]
+        if mix["gate_threshold"] != Policy().gate_threshold:
+            sys.exit(f"load/mix.json was computed at cutoff {mix['gate_threshold']}, Policy has "
+                     f"{Policy().gate_threshold}: re-run load/mix.py")
+        ds = draft_share(mix, x)            # phases have no repeats by design; burst repeats are extra
+        sampler = Sampler(load_pool(POOL_PATH), x, rng)
+        mixinfo = {"mode": "pool", "pool": mix["pool"], "n_pool": mix["n_pool"], "X": x, "Y": y,
+                   "pass_answerable": mix["pass_answerable"], "pass_unanswerable": mix["pass_unanswerable"]}
+    sched = schedule(sc, rng, ds, sampler, y or 0.0, a.max_minutes)
+    phase_min = sum(ph["minutes"] for ph in sc["phases"])
+    mixinfo.update(draft_share_expected=round(ds, 4),
+                   question_rate_per_min=[round(ph["draft_mult"] * CEILING_PER_MIN / ds, 3) for ph in sc["phases"]],
+                   draft_rate_per_min_expected=[round(ph["draft_mult"] * CEILING_PER_MIN, 3) for ph in sc["phases"]],
+                   arrivals_by_kind={k: sum(s[3] == k for s in sched) for k in ("fresh", "burst", "burst_repeat", "smoke")},
+                   forced_repeats=sampler.forced_repeats if sampler else None, phase_minutes=phase_min)
     name = f"{a.scenario}{('_' + a.tag) if a.tag else ''}_rare{a.rare}"
     stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
     run = f"{name}_{stamp}"
@@ -97,7 +131,6 @@ def main():
         pol.max_retries_per_question = a.max_retries
     if a.no_retry_budget:
         pol.retry_budget_fraction = 1e9
-    setting = SETTINGS[a.setting]
     # Our limiter knows the limits we'd know in production. In the halved scenario it is NOT told:
     # limits "change without notice" (brief); it learns only from headers and 429s.
     lim = Limiter([SMALL, BIG])
@@ -115,12 +148,15 @@ def main():
     svc = Service(pl, workers=pol.workers, scenario=a.scenario, events_path=ROOT / f"raw/events_{run}.jsonl")
     meta = {"run": run, "scenario": a.scenario, "desc": sc["desc"], "rare_rate": a.rare, "seed": a.seed,
             "setting": setting.name, "policy": pol.as_dict(), "patience": PATIENCE, "n_arrivals": len(sched),
-            "started": dt.datetime.now(dt.timezone.utc).isoformat(), "ceiling_per_min": CEILING_PER_MIN}
+            "started": dt.datetime.now(dt.timezone.utc).isoformat(), "ceiling_per_min": CEILING_PER_MIN,
+            "mix": mixinfo}
     (ROOT / f"raw/meta_{run}.json").write_text(json.dumps(meta, indent=2))
-    print(f"[{run}] {len(sched)} arrivals over {sched[-1][0] / 60 if sched else 0:.1f} min", flush=True)
+    print(f"[{run}] {len(sched)} arrivals over {sched[-1][0] / 60 if sched else 0:.1f} min; "
+          f"draft share {ds:.2f} -> questions/min {mixinfo['question_rate_per_min']}, "
+          f"drafts/min {mixinfo['draft_rate_per_min_expected']}; forced repeats {mixinfo['forced_repeats']}", flush=True)
 
     t_start = time.time()
-    for i, (t, q, pat) in enumerate(sched):
+    for i, (t, q, pat, _kind) in enumerate(sched):
         delay = t_start + t - time.time()
         if delay > 0:
             time.sleep(delay)

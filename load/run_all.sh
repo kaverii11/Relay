@@ -4,6 +4,9 @@
 # caffeinate -i keeps the Mac awake for the whole run. Starts its own stand-in on :8099.
 cd "$(dirname "$0")/.." || exit 1
 PY=.venv/bin/python
+# Needs: K's pool (eval/k_questions.csv), X and Y set in load/scenarios.py, deadline + cutoff set,
+# and load/mix.json recomputed at the current cutoff (done here so it can't be stale).
+$PY load/mix.py || exit 1
 .venv/bin/uvicorn standin.server:app --port 8099 --log-level warning > raw/standin_server.log 2>&1 &
 SRV=$!
 trap 'kill $SRV' EXIT
