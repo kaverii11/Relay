@@ -6,7 +6,7 @@
 
 Exactly the production understand call: same prompt (relay.prompts.understand_messages), model
 gpt-oss-20b, temperature 0, reasoning_effort = Policy.reasoning_effort, max_tokens 400.
-Also ~5 "Quick question:"-style WORDING PROBES of K's questions (assistant-written; not eval, not
+Also ~5 "Quick question:"-style WORDING PROBES of K's TUNING questions (assistant-written; not eval, not
 tuning, not the load pool), to measure how much the rewrite undoes casual wording.
 
 Stores eval/rewrites_20b.json, keyed by textnorm.match_key(question). The stand-in replays the
@@ -48,9 +48,12 @@ def lower_first(q):
 
 
 def items(pool, n_probe, seed):
+    if any(not p["set"] for p in pool):
+        sys.exit("set is blank: run eval/split.py first (K). Wording probes are drawn from TUNING questions only.")
     out = [{"id": p["id"], "kind": "k", "set": p["set"], "type": p.get("type", ""), "answerable": p["ans"], "q": p["q"]}
            for p in pool]
-    picks = random.Random(seed).sample(pool, min(n_probe, len(pool)))
+    tuning = [p for p in pool if p["set"] == "tuning"]
+    picks = random.Random(seed).sample(tuning, min(n_probe, len(tuning)))
     for i, (p, fr) in enumerate(zip(picks, FRAMINGS)):
         out.append({"id": f"wp{i}_{p['id']}", "kind": "wording_probe", "parent_id": p["id"], "set": "wording_probe",
                     "answerable": p["ans"], "q": fr.format(q=lower_first(p["q"])), "author": "assistant"})

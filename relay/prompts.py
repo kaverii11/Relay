@@ -27,6 +27,8 @@ Rules:
 - Every claim must be backed by a passage: give its id (e.g. "C2") and a short quote copied WORD FOR WORD from that passage.
 - If the passages do not contain the answer, set "not_in_papers": true. Do not guess, and do not use outside knowledge.
 - Watch for numbers that belong to OTHER systems or baselines in a table: only report a number for the system asked about.
+- If the question states a value (a number, setting or name), compare it with the passages. If they disagree, say so
+  and give the value the passages report, with its citation. Do not answer as if the stated value were true.
 Return ONLY JSON:
 {"not_in_papers": false,
  "answer": "2-4 sentences, with [C#] after each claim",

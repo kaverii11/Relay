@@ -3,7 +3,10 @@
   .venv/bin/python eval/gate_report.py                 # tuning questions + wording probes
   .venv/bin/python eval/gate_report.py --include-eval  # also K's eval questions (only once the cutoff is fixed)
 
-The eval set is HELD OUT by default, so the cutoff is chosen from tuning questions only.
+The eval set is HELD OUT by default, so the cutoff is chosen from tuning questions only. Rows with a
+blank `set` (before eval/split.py) are never used for tuning. The sweep is on `gate_expected`
+(pass/refuse, K), NOT on `answerable`: false-premise / comparison-not-made / number-not-reported
+questions are unanswerable but should pass the gate.
 Gate = max cross-encoder score over the pieces sent (relay.retrieval), setting medium_rerank.
 The sweep lists every observed tuning score as a possible cutoff, with what it would do;
 it does not pick one (K picks).
@@ -38,18 +41,24 @@ def main():
     g = lambda q: ret.search(q)[1]  # noqa: E731
 
     rows = []
+    def visible(set_):                     # eval held out; blank set (not split yet) never shown
+        return set_ == "tuning" or (a.include_eval and set_ == "eval")
     for rec in rw.values():
-        if rec["kind"] == "k" and rec["set"] == "eval" and not a.include_eval:
-            continue
-        rows.append({**rec, "raw": g(rec["q"]), "rw": g(rec["search_query"])})
+        # the CURRENT set from k_questions.csv (a rewrite may have been stored before the split)
+        own = pool.get(rec.get("parent_id") or rec["id"])
+        if own is None or not visible(own["set"]):
+            continue                       # probes follow their parent: no peeking at eval questions
+        rows.append({**rec, "set": own["set"] if rec["kind"] == "k" else rec["set"],
+                     "raw": g(rec["q"]), "rw": g(rec["search_query"])})
     missing = [p for p in pool.values() if match_key(p["q"]) not in rw
-               and (p["set"] != "eval" or a.include_eval)]
+               and (p["set"] == "tuning" or (a.include_eval and p["set"] == "eval"))]
 
     print(f"Gate scores ({SETTINGS[a.setting].name}); eval set {'INCLUDED' if a.include_eval else 'held out'}")
-    print("| id | set | answerable | raw score | rewritten score | change | question -> rewrite |")
-    print("|---|---|---|---|---|---|---|")
+    print("| id | set | answerable | gate_expected | raw score | rewritten score | change | question -> rewrite |")
+    print("|---|---|---|---|---|---|---|---|")
     for r in sorted(rows, key=lambda r: (r["kind"], r["set"], r["id"])):
-        print(f"| {r['id']} | {r['set']} | {'yes' if r['answerable'] else 'no'} | {r['raw']:.2f} | {r['rw']:.2f} | "
+        ge = pool[r.get("parent_id", r["id"])]["meta"].get("gate_expected", "?")
+        print(f"| {r['id']} | {r['set']} | {'yes' if r['answerable'] else 'no'} | {ge} | {r['raw']:.2f} | {r['rw']:.2f} | "
               f"{r['rw'] - r['raw']:+.2f} | {r['q']} -> {r['search_query']} |")
     if missing:
         print(f"\n{len(missing)} question(s) have no stored rewrite (failed or not run): {[p['id'] for p in missing]}")
@@ -69,10 +78,14 @@ def main():
 
     tune = [r for r in rows if r["kind"] == "k" and r["set"] == "tuning"]
     if tune:
-        ans = [r["rw"] for r in tune if r["answerable"]]
-        una = [r["rw"] for r in tune if not r["answerable"]]
-        print(f"\nCutoff sweep on TUNING questions, rewritten query (answerable n={len(ans)}, unanswerable n={len(una)})")
-        print("| cutoff (= an observed score) | answerable passed | unanswerable refused | wrong refusals | wrong passes |")
+        gx = lambda r: pool[r["id"]]["meta"].get("gate_expected", "").lower()  # noqa: E731
+        bad = [r["id"] for r in tune if gx(r) not in ("pass", "refuse")]
+        if bad:
+            sys.exit(f"gate_expected missing on tuning rows {bad}: fix eval/k_questions.csv first")
+        ans = [r["rw"] for r in tune if gx(r) == "pass"]
+        una = [r["rw"] for r in tune if gx(r) == "refuse"]
+        print(f"\nCutoff sweep on TUNING questions, rewritten query, by gate_expected (pass n={len(ans)}, refuse n={len(una)})")
+        print("| cutoff (= an observed score) | should-pass passed | should-refuse refused | wrong refusals | wrong passes |")
         print("|---|---|---|---|---|")
         for c in sorted({round(x, 2) for x in ans + una}):
             ap_ = sum(x >= c for x in ans)
