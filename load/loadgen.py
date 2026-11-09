@@ -24,7 +24,7 @@ sys.path.insert(0, str(ROOT))
 
 from eval.latency_questions import QUESTIONS  # noqa: E402
 from eval.seed_questions import SEED  # noqa: E402
-from load.mix import MIX_PATH, POOL_PATH, Sampler, draft_share, load_pool  # noqa: E402
+from load.mix import MIX_PATH, Sampler, draft_share, load_load_pool  # noqa: E402
 from load.scenarios import CEILING_PER_MIN, MIX, PATIENCE, SCENARIOS  # noqa: E402
 from relay.config import BIG, SETTINGS, SMALL, Policy  # noqa: E402
 from relay.limiter import Limiter  # noqa: E402
@@ -35,7 +35,7 @@ from relay.service import Service, write_csv  # noqa: E402
 POOL = QUESTIONS + [q for q, _ in SEED]
 
 
-def schedule(sc, rng, draft_share, sampler=None, repeat_share=0.0, max_minutes=None):
+def schedule(sc, rng, draft_share, sampler=None, repeat_share=0.0, max_minutes=None, hot=0):
     """List of (t_seconds, question, patience_s, kind). kind = fresh | burst | burst_repeat | smoke.
     Poisson phases at QUESTION rate = draft_mult x ceiling / draft_share, plus bursts."""
     arr, t0 = [], 0.0
@@ -54,7 +54,7 @@ def schedule(sc, rng, draft_share, sampler=None, repeat_share=0.0, max_minutes=N
     arr.sort()
     if max_minutes:
         arr = [a for a in arr if a[0] < max_minutes * 60]
-    out, in_burst = [], {}
+    out, hot_sets = [], {}
     for a, bi in arr:
         pat = PATIENCE["median_s"] * math.exp(rng.gauss(0, PATIENCE["sigma"]))
         if sampler is None:                     # smoke: old CC-written pool, with replacement
@@ -62,9 +62,9 @@ def schedule(sc, rng, draft_share, sampler=None, repeat_share=0.0, max_minutes=N
         elif bi is None:
             out.append((a, sampler.fresh()["q"], pat, "fresh"))
         else:
-            asked = in_burst.setdefault(bi, [])
-            p, rep = sampler.burst(asked, repeat_share)
-            asked.append(p)
+            if bi not in hot_sets:
+                hot_sets[bi] = sampler.hot_set(hot)
+            p, rep = sampler.burst(hot_sets[bi], repeat_share)
             out.append((a, p["q"], pat, "burst_repeat" if rep else "burst"))
     return out
 
@@ -91,21 +91,21 @@ def main():
     sc = SCENARIOS[a.scenario]
     rng = random.Random(a.seed)
     setting = SETTINGS[a.setting]
-    x, y = MIX["unanswerable_share"], MIX["burst_repeat_share"]
+    x, y, hot = MIX["unanswerable_share"], MIX["burst_repeat_share"], MIX["burst_hot_set"]
     if a.smoke:
         ds, sampler, mixinfo = a.draft_share or 1.0, None, {"mode": "smoke"}
     else:
-        if x is None or y is None:
-            sys.exit("MIX X / Y not set by K (load/scenarios.py, DECISIONS §22); use --smoke for a smoke test")
+        if x is None or y is None or (sc.get("bursts") and not hot):
+            sys.exit("MIX X / Y / hot set not set by K (load/scenarios.py, DECISIONS §22); use --smoke for a smoke test")
         mix = json.loads(MIX_PATH.read_text())[setting.name]
         if mix["gate_threshold"] != Policy().gate_threshold:
             sys.exit(f"load/mix.json was computed at cutoff {mix['gate_threshold']}, Policy has "
                      f"{Policy().gate_threshold}: re-run load/mix.py")
         ds = draft_share(mix, x)            # phases have no repeats by design; burst repeats are extra
-        sampler = Sampler(load_pool(POOL_PATH), x, rng)
-        mixinfo = {"mode": "pool", "pool": mix["pool"], "n_pool": mix["n_pool"], "X": x, "Y": y,
+        sampler = Sampler(load_load_pool(), x, rng)
+        mixinfo = {"mode": "pool", "pool": mix["pool"], "n_pool": mix["n_pool"], "X": x, "Y": y, "hot_set": hot,
                    "pass_answerable": mix["pass_answerable"], "pass_unanswerable": mix["pass_unanswerable"]}
-    sched = schedule(sc, rng, ds, sampler, y or 0.0, a.max_minutes)
+    sched = schedule(sc, rng, ds, sampler, y or 0.0, a.max_minutes, hot=hot or 0)
     phase_min = sum(ph["minutes"] for ph in sc["phases"])
     mixinfo.update(draft_share_expected=round(ds, 4),
                    question_rate_per_min=[round(ph["draft_mult"] * CEILING_PER_MIN / ds, 3) for ph in sc["phases"]],
