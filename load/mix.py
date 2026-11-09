@@ -125,13 +125,38 @@ def _rel(p: Path) -> str:
         return str(p)
 
 
+REWRITES_PATH = ROOT / "eval/rewrites_20b.json"
+
+
+def stand_in_query(p, rewrites):
+    """The query the stand-in's understand step returns for this question: the stored real 20b
+    rewrite if there is one (K's questions, K §24), else the raw question (variants)."""
+    from relay.textnorm import match_key
+    r = rewrites.get(match_key(p["q"]))
+    return (r["search_query"], True) if r and r.get("search_query") else (p["q"], False)
+
+
+def load_rewrites():
+    return json.loads(REWRITES_PATH.read_text()) if REWRITES_PATH.exists() else {}
+
+
 def _scores(pool):
+    """Gate score of the query the stand-in will actually search with (rewrite or raw)."""
     from relay.config import SETTINGS
     from relay.retrieval import Retriever, cross_encoder
     ret = Retriever(SETTINGS["medium_rerank"])          # the setting the load scenarios use (loadgen default)
     cross_encoder()
     ret.search("warm-up query about attention heads")
-    return SETTINGS["medium_rerank"].name, {p["id"]: ret.search(p["q"])[1] for p in pool}
+    rw = load_rewrites()
+    sc, used_rw = {}, 0
+    for p in pool:
+        q, is_rw = stand_in_query(p, rw)
+        used_rw += is_rw
+        sc[p["id"]] = ret.search(q)[1]
+    k = [p for p in pool if p["set"] != "variant"]
+    if rw and used_rw < len(k):
+        print(f"  WARNING: only {used_rw} of {len(k)} K questions have a stored rewrite; the rest scored raw")
+    return SETTINGS["medium_rerank"].name, sc, used_rw
 
 
 def main():
@@ -162,7 +187,7 @@ def main():
         return
 
     pool = load_load_pool()
-    name, sc = _scores(pool)
+    name, sc, used_rw = _scores(pool)
     if a.spotcheck:
         var = [p for p in pool if p["set"] == "variant"]
         par = {p["id"]: p for p in pool}
@@ -176,7 +201,7 @@ def main():
         return sum(sc[p["id"]] >= cut for p in items) / max(1, len(items))
     groups = {g: [p for p in pool if (p["set"] == "variant") == (g == "variant")] for g in ("k", "variant")}
     out = {name: {
-        "gate_threshold": cut,
+        "gate_threshold": cut, "query": "stored 20b rewrite where available, else raw", "n_rewritten": used_rw,
         # over the WHOLE load pool, every item scored on its own
         "pass_answerable": share([p for p in pool if p["ans"]]),
         "pass_unanswerable": share([p for p in pool if not p["ans"]]),

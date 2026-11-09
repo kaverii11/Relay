@@ -63,6 +63,19 @@ class Bucket:
         return max(0, int(self.limit - self.used))
 
 
+REWRITES_PATH = Path(__file__).resolve().parents[1] / "eval/rewrites_20b.json"
+
+
+def _load_rewrites() -> dict:
+    """Real 20b understand replies (temperature 0) for K's questions + wording probes (K §24),
+    keyed by match_key(question). Replayed verbatim; anything else (e.g. variants) gets the raw
+    question as its search query: a KNOWN DIFFERENCE (more gate refusals than real Groq)."""
+    try:
+        return {k: v["text"] for k, v in json.loads(REWRITES_PATH.read_text()).items() if v.get("text")}
+    except (OSError, ValueError):
+        return {}
+
+
 class State:
     def __init__(self):
         self.reset()
@@ -84,7 +97,9 @@ class State:
         self.inflight = 0
         self.peak_inflight = 0
         self.sem = asyncio.Semaphore(self.cfg["max_conc"])
-        self.stats = {"requests": 0, "ok": 0, "429": {}, "5xx": 0, "stall": 0, "drop": 0, "rare": 0}
+        self.stats = {"requests": 0, "ok": 0, "429": {}, "5xx": 0, "stall": 0, "drop": 0, "rare": 0,
+                      "rewrite_replayed": 0, "rewrite_raw": 0}
+        self.rewrites = _load_rewrites()
 
     def _build_buckets(self):
         self.buckets = {m: {k: Bucket(self.cfg["limits"][k], LIMIT_NAMES[k][1]) for k in LIMIT_NAMES}
@@ -105,6 +120,11 @@ def make_reply(messages) -> str:
     system = next((m["content"] for m in messages if m["role"] == "system"), "")
     user = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
     if "route questions" in system:          # step 1 understand
+        from relay.textnorm import match_key
+        hit = S.rewrites.get(match_key(user))
+        S.stats["rewrite_replayed" if hit else "rewrite_raw"] += 1
+        if hit:
+            return hit
         return json.dumps({"papers": [], "search_query": user[:200], "needs_numbers": False, "cross_paper": False})
     if "verify" in system.lower():           # step 5 check
         return json.dumps({"supported": True, "problems": []})
