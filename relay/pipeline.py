@@ -1,0 +1,387 @@
+"""The Relay pipeline: one user question, end to end.
+
+  [1 understand] 20b rewrites the question into a search query (never judges scope)
+  [2 retrieve ]  TOOL: BM25 + cross-encoder over the chunked papers (local, no tokens)
+  [3 decide   ]  BRANCH: cache hit | gate below threshold -> "the papers don't say"
+                 | no capacity within the deadline -> busy reply | draft (choosing a ladder rung)
+  [4 draft    ]  120b (or 20b on the ladder) writes a cited answer with word-for-word quotes
+  [5 check    ]  code check (ids + quotes) + model check (20b); LOOP: one redraft on failure
+
+The answer is buffered until the check passes, so the person's first token comes after step 5.
+Every model call goes through call_model(), which owns the retry policy (DECISIONS §3).
+"""
+from __future__ import annotations
+
+import datetime as dt
+import json
+import math
+import random
+import re
+import threading
+import time
+from dataclasses import dataclass, field
+
+import httpx
+
+from relay.config import BIG, PAPER_VERSIONS, SMALL, Policy, RetrievalSetting
+from relay.limiter import Limiter
+from relay.llm import stream_chat
+from relay.prompts import check_messages, draft_messages, understand_messages
+from relay.retrieval import Retriever
+from relay.textnorm import match_key, quote_in
+
+DRAFT_OUT_EST = 350      # tokens; real 120b drafts averaged 258 out (stage 2a), padded for safety
+SHORT_OUT_EST = 120      # understand/check; real 20b understand averaged 98 out
+EXPECTED_WORK_MS = {"draft": 1100, "check": 550}   # unloaded medians, stage 2a (draft total, 20b short total)
+
+
+class Cancelled(Exception):
+    """The person gave up (their patience ran out)."""
+
+
+class Busy(Exception):
+    def __init__(self, limit_kind, eta_s):
+        super().__init__(limit_kind)
+        self.limit_kind, self.eta_s = limit_kind, eta_s
+
+
+class DailyLimit(Exception):
+    def __init__(self, model, kind):
+        super().__init__(kind)
+        self.model, self.kind = model, kind
+
+
+class CallFailed(Exception):
+    pass
+
+
+def est_tokens(messages) -> int:
+    return max(1, sum(len(m["content"]) for m in messages) // 4)
+
+
+def limit_kind(body: str) -> str:
+    b = (body or "").lower()
+    for k in ("rpd", "tpd", "itpm", "rpm", "tpm"):
+        if f"({k})" in b:
+            return k
+    if "per day" in b:
+        return "tpd" if "token" in b else "rpd"
+    return "rpm" if "request" in b else "tpm"
+
+
+def parse_json(text: str):
+    m = re.search(r"\{.*\}", text or "", re.S)
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(0))
+    except json.JSONDecodeError:
+        return None
+
+
+def normalise_q(q: str) -> str:
+    return " ".join(re.findall(r"\w+", q.lower()))
+
+
+class ExactCache:
+    """Exact match on the normalised question + setting + paper versions. No semantic matching
+    (DECISIONS §2: 'Moshi latency' must not hit 'Moshi theoretical latency')."""
+
+    def __init__(self):
+        self.d, self.lock = {}, threading.Lock()
+
+    def key(self, q, setting):
+        return (normalise_q(q), setting, PAPER_VERSIONS)
+
+    def get(self, q, setting):
+        with self.lock:
+            return self.d.get(self.key(q, setting))
+
+    def put(self, q, setting, value):
+        with self.lock:
+            self.d[self.key(q, setting)] = value
+
+
+@dataclass
+class Ctx:
+    rid: str
+    question: str
+    t0: float                       # perf_counter at ARRIVAL
+    cancel: threading.Event
+    deadline_ms: float
+    retries: int = 0
+    calls: int = 0
+    service_start_ms: float | None = None   # first model call SENT (or cache answered); None = never served
+    tokens_in: int = 0
+    tokens_out: int = 0
+    events: list = field(default_factory=list)
+
+    def ms(self):
+        return (time.perf_counter() - self.t0) * 1000
+
+    def ev(self, name, **kw):
+        self.events.append({"t_ms": round(self.ms(), 1), "ev": name, **kw})
+
+    def sleep(self, s, why):
+        """Interruptible wait; logged as WAITING (planned limiter wait) or RETRYING (backoff)."""
+        if s <= 0:
+            return
+        self.ev(why + "_start", seconds=round(s, 3))
+        if self.cancel.wait(s):
+            raise Cancelled()
+        self.ev(why + "_end")
+
+
+class Pipeline:
+    def __init__(self, *, base_url, api_key, source, setting: RetrievalSetting, policy: Policy,
+                 limiter: Limiter, cache: ExactCache | None, retriever: Retriever):
+        self.base_url, self.api_key, self.source = base_url, api_key, source
+        self.setting, self.p, self.lim, self.cache, self.ret = setting, policy, limiter, cache, retriever
+        self.http = httpx.Client(timeout=None, limits=httpx.Limits(max_connections=200, max_keepalive_connections=50))
+
+    # ------------------------------------------------------------------ model calls + retry policy
+    def call_model(self, ctx: Ctx, model, messages, kind, effort=None, out_est=SHORT_OUT_EST):
+        n_in = est_tokens(messages)
+        attempt = 0
+        while True:
+            if ctx.cancel.is_set():
+                raise Cancelled()
+            left_ms = ctx.deadline_ms - ctx.ms()
+            max_wait = max(0.0, (left_ms - EXPECTED_WORK_MS.get(kind, 550)) / 1000)
+            wait, binding, ok = self.lim.acquire(model, n_in, out_est, max_wait)
+            if not ok:
+                if binding in ("rpd", "tpd"):
+                    raise DailyLimit(model, binding)
+                raise Busy(binding, wait)
+            # planned wait for the slot our limiter reserved; +50 ms because arriving exactly on the
+            # refill boundary still got a 429 in the smoke test (float edge, no network slack locally)
+            ctx.sleep(wait + 0.05 if wait > 0 else 0, "waiting")
+            self.lim.note_request(is_retry=attempt > 0)
+            ctx.calls += 1
+            if ctx.service_start_ms is None:
+                ctx.service_start_ms = ctx.ms()
+            timeout = self.p.call_timeout_draft_s if kind == "draft" else self.p.call_timeout_short_s
+            timeout = max(0.5, min(timeout, (ctx.deadline_ms - ctx.ms()) / 1000))
+            extra = {"reasoning_effort": effort or self.p.reasoning_effort}
+            ctx.ev("call_start", step=kind, model=model, attempt=attempt, est_in=n_in)
+            r = stream_chat(messages, model, base_url=self.base_url, api_key=self.api_key,
+                            max_tokens=800 if kind == "draft" else 400, timeout_s=timeout,
+                            client=self.http, extra=extra)
+            self.lim.sync(model, r.headers)
+            self.lim.settle(model, out_est, r.tokens_out)
+            ctx.tokens_in += r.tokens_in
+            ctx.tokens_out += r.tokens_out
+            lk = limit_kind(r.error_body) if r.status == 429 else ""
+            ctx.ev("call_end", step=kind, model=model, attempt=attempt, status=r.status,
+                   err=r.error_kind, limit=lk, first_any_ms=r.first_any_ms, ttft_ms=r.ttft_ms,
+                   work_ms=round(r.total_ms, 1), tokens_in=r.tokens_in, tokens_out=r.tokens_out,
+                   retry_after=r.headers.get("retry-after"))
+            if r.status == 200 and not r.error_kind:
+                return r
+            # ---- failure: decide whether to retry
+            if r.status == 429 and lk in ("rpd", "tpd"):
+                raise DailyLimit(model, lk)               # never retry a per-day limit
+            retryable = r.status == 429 or r.status >= 500 or r.error_kind in ("network", "truncated") \
+                or (r.error_kind == "timeout" and kind != "draft" and attempt == 0)
+            if r.status == 429:
+                ra = float(r.headers.get("retry-after") or 1)
+                delay = ra if self.p.retry_jitter == "exact" else ra + random.uniform(0, max(0.5, ra * 0.5))
+            else:
+                delay = random.uniform(0, self.p.backoff_base_ms * (2 ** attempt)) / 1000   # full jitter
+            out_of_time = (ctx.ms() + delay * 1000 + EXPECTED_WORK_MS.get(kind, 550)) > ctx.deadline_ms
+            if (not retryable or ctx.retries >= self.p.max_retries_per_question or out_of_time
+                    or not self.lim.retry_allowed(self.p.retry_budget_fraction)):
+                if r.status == 429:
+                    raise Busy(lk, float(r.headers.get("retry-after") or 1))
+                raise CallFailed(f"{kind} {r.status} {r.error_kind}")
+            ctx.retries += 1
+            attempt += 1
+            ctx.sleep(delay, "retrying")
+
+    # ------------------------------------------------------------------ the five steps
+    def run(self, ctx: Ctx) -> dict:
+        out = {"degrade_level": "full", "model": "", "answer": "", "kind": "", "gate": None,
+               "citations": [], "query": None}
+        try:
+            # cache (rung 0)
+            if self.p.cache and self.cache:
+                hit = self.cache.get(ctx.question, self.setting.name)
+                if hit:
+                    ctx.service_start_ms = ctx.ms()
+                    out.update(hit, degrade_level="cache")
+                    return self._deliver(ctx, out, "ok")
+
+            # [1] understand: rewrite query. If it can't run, the raw question still works as a query.
+            query, hints = ctx.question, {}
+            try:
+                r = self.call_model(ctx, SMALL, understand_messages(ctx.question), "understand")
+                j = parse_json(r.text) or {}
+                query = (j.get("search_query") or "").strip() or ctx.question
+                hints = {k: j.get(k) for k in ("papers", "needs_numbers", "cross_paper")}
+            except (Busy, DailyLimit, CallFailed) as e:
+                ctx.ev("understand_skipped", why=type(e).__name__)
+                out["degrade_level"] = "raw_query"
+            out["query"] = query
+
+            # [2] retrieve (tool)
+            hits, gate, tms = self.ret.search(query)
+            out["gate"] = round(gate, 3)
+            ctx.ev("retrieve", **{k: round(v, 1) for k, v in tms.items()}, gate=round(gate, 3),
+                   hits=[h.chunk.cite() for h in hits])
+
+            # [3] decide: refuse if the evidence isn't there (cross-encoder on the rewritten query)
+            if gate < self.p.gate_threshold:
+                return self._refuse(ctx, out, hits, "gate")
+
+            # [3] decide: pick the ladder rung that fits the limits and the deadline
+            plan = self._plan_draft(ctx, query, hits)
+            if plan is None:
+                return self._busy(ctx, out, *self._busy_eta(ctx, query, hits))
+            model, k, level = plan
+            if level != "full":
+                out["degrade_level"] = level
+            use = hits[:k]
+
+            # [4] draft  -> [5] check, with ONE redraft loop
+            feedback = None
+            for round_ in range(2):
+                try:
+                    r = self.call_model(ctx, model, draft_messages(ctx.question, use, feedback), "draft",
+                                        out_est=DRAFT_OUT_EST)
+                except DailyLimit as e:
+                    if model == BIG:                     # per-day limit on 120b: drop to 20b (separate quota)
+                        ctx.ev("ladder", to="small_model", why=e.kind)
+                        model, out["degrade_level"] = SMALL, "small_model"
+                        r = self.call_model(ctx, model, draft_messages(ctx.question, use, feedback), "draft",
+                                            out_est=DRAFT_OUT_EST)
+                    else:
+                        raise
+                out["model"] = model
+                d = parse_json(r.text)
+                if d is None:
+                    feedback = "Output was not valid JSON."
+                    continue
+                if d.get("not_in_papers"):
+                    return self._refuse(ctx, out, use, "drafter")
+                ok, why = self._code_check(d, use)
+                if ok and self._needs_model_check(hints):
+                    ok, why = self._model_check(ctx, d, use)
+                ctx.ev("check", round=round_, ok=ok, why=why)
+                if ok:
+                    out["answer"] = self._render(d["answer"], use)
+                    out["citations"] = sorted({use[int(c["chunk"][1:]) - 1].chunk.cite() for c in d["claims"]})
+                    out["kind"] = "answer"
+                    if self.cache:
+                        self.cache.put(ctx.question, self.setting.name,
+                                       {k: out[k] for k in ("answer", "citations", "kind", "model", "query", "gate")})
+                    return self._deliver(ctx, out, "ok")
+                feedback = why
+            return self._refuse(ctx, out, use, "unverified")
+        except Cancelled:
+            ctx.ev("gave_up")
+            return self._finish(ctx, out, "timeout", gave_up=True)
+        except Busy as e:
+            return self._busy(ctx, out, e.limit_kind, e.eta_s)
+        except DailyLimit as e:
+            return self._busy(ctx, out, e.kind, self._daily_eta(e.model))
+        except CallFailed as e:
+            ctx.ev("failed", why=str(e))
+            return self._finish(ctx, out, "error")
+
+    # ------------------------------------------------------------------ decide helpers
+    def _plan_draft(self, ctx, query, hits):
+        k_full, k_less = self.setting.k, max(2, self.setting.k // 2)
+        rungs = [(BIG, k_full, "full"), (BIG, k_less, "fewer_chunks"), (SMALL, k_less, "small_model")]
+        for model, k, level in rungs:
+            if model == BIG and self.lim.daily_fraction_left(BIG) < self.p.daily_reserve_fraction:
+                ctx.ev("ladder_skip", rung=level, why="daily_reserve")
+                continue
+            n_in = est_tokens(draft_messages(ctx.question, hits[:k]))
+            wait, binding = self.lim.predict_wait_s(model, n_in, DRAFT_OUT_EST)
+            if binding in ("rpd", "tpd") and wait > 0:
+                continue
+            budget_ms = ctx.deadline_ms - ctx.ms() - EXPECTED_WORK_MS["draft"] - EXPECTED_WORK_MS["check"]
+            if wait * 1000 <= budget_ms:
+                ctx.ev("ladder", rung=level, model=model, k=k, predicted_wait_s=round(wait, 2))
+                return model, k, level
+        return None
+
+    def _busy_eta(self, ctx, query, hits):
+        best = (None, math.inf)
+        for model in (BIG, SMALL):
+            n_in = est_tokens(draft_messages(ctx.question, hits[:max(2, self.setting.k // 2)]))
+            w, kind = self.lim.predict_wait_s(model, n_in, DRAFT_OUT_EST)
+            if w < best[1]:
+                best = (kind, w)
+        return best
+
+    def _daily_eta(self, model):
+        w, _ = self.lim.predict_wait_s(model, 3300, 0)
+        return w
+
+    def _needs_model_check(self, hints):
+        if self.p.check_mode == "both":
+            return True
+        if self.p.check_mode == "code_only":
+            return False
+        return bool(hints.get("needs_numbers") or hints.get("cross_paper"))   # "adaptive", §8 option (iii)
+
+    def _code_check(self, d, use):
+        claims = d.get("claims") or []
+        if not claims or not d.get("answer"):
+            return False, "No claims with quotes."
+        for c in claims:
+            cid = str(c.get("chunk", ""))
+            if not re.fullmatch(r"C\d+", cid) or not 1 <= int(cid[1:]) <= len(use):
+                return False, f"Cited {cid}, which is not one of the passages."
+            if not quote_in(c.get("quote", ""), use[int(cid[1:]) - 1].chunk.text):
+                return False, f"Quote for {cid} is not word-for-word in that passage."
+        return True, ""
+
+    def _model_check(self, ctx, d, use):
+        r = self.call_model(ctx, SMALL, check_messages(ctx.question, d["answer"], d["claims"]), "check",
+                            effort=self.p.check_effort)
+        j = parse_json(r.text) or {}
+        if j.get("supported") is True:
+            return True, ""
+        return False, "; ".join(j.get("problems") or ["checker did not confirm support"])
+
+    def _render(self, answer, use):
+        return re.sub(r"\[C(\d+)\]", lambda m: use[int(m.group(1)) - 1].chunk.cite()
+                      if 1 <= int(m.group(1)) <= len(use) else m.group(0), answer)
+
+    # ------------------------------------------------------------------ replies (no model calls)
+    def _refuse(self, ctx, out, hits, why):
+        near = ", ".join(h.chunk.cite() for h in hits[:3])
+        out.update(kind="refusal", answer=(
+            "The papers don't say. I searched all three papers (Attention Is All You Need v7, Moshi v1, "
+            f"Dynamic Chunking v2) and found nothing that answers this. Closest passages: {near}."),
+            citations=[h.chunk.cite() for h in hits[:3]], refuse_reason=why)
+        if self.cache:
+            self.cache.put(ctx.question, self.setting.name,
+                           {k: out[k] for k in ("answer", "citations", "kind", "query", "gate")})
+        return self._deliver(ctx, out, "ok")
+
+    def _busy(self, ctx, out, limit_kind, eta_s):
+        eta = "under a minute" if eta_s < 60 else (f"about {math.ceil(eta_s / 60)} min" if eta_s < 3600
+                                                    else f"about {eta_s / 3600:.1f} h")
+        at = (dt.datetime.now() + dt.timedelta(seconds=eta_s)).strftime("%H:%M")
+        out.update(kind="busy", answer=(
+            "I can't give you a checked answer right now: the assistant has hit its "
+            f"{'daily' if limit_kind in ('rpd', 'tpd') else 'per-minute'} usage limit. "
+            f"Capacity for a question like yours should be back in {eta} (around {at}). "
+            "I won't send an unchecked answer instead. Please ask again then."), busy_limit=limit_kind,
+            eta_s=round(eta_s, 1))
+        ctx.ev("busy", limit=limit_kind, eta_s=round(eta_s, 1))
+        return self._finish(ctx, out, "rate_limited", first_token=False)
+
+    def _deliver(self, ctx, out, status):
+        ctx.ev("first_token")
+        return self._finish(ctx, out, status, first_token=True)
+
+    def _finish(self, ctx, out, status, first_token=False, gave_up=False):
+        t = ctx.ms()
+        return {**out, "status": status, "first_token_ms": round(t, 1) if first_token else None,
+                "total_ms": round(t, 1), "gave_up": int(gave_up), "retries": ctx.retries, "calls": ctx.calls,
+                "tokens_in": ctx.tokens_in, "tokens_out": ctx.tokens_out, "events": ctx.events,
+                "service_start_ms": None if ctx.service_start_ms is None else round(ctx.service_start_ms, 1)}

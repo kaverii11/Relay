@@ -30,7 +30,7 @@ class CallResult:
     tokens_out: int = 0
     headers: dict = field(default_factory=dict)   # x-ratelimit-*, retry-after, etc.
     error_body: str = ""
-    error_kind: str = ""        # "", "timeout", "network", "http"
+    error_kind: str = ""        # "", "timeout", "network", "http", "truncated"
     started_output: bool = False  # did any content token arrive?
 
 
@@ -64,6 +64,7 @@ def stream_chat(messages, model, *, base_url=GROQ_BASE, api_key=None, max_tokens
                 res.error_kind = "http"
                 return res
             parts, rparts = [], []
+            got_done = False
             for line in r.iter_lines():
                 if time.perf_counter() - t0 > timeout_s:
                     res.error_kind = "timeout"
@@ -72,6 +73,7 @@ def stream_chat(messages, model, *, base_url=GROQ_BASE, api_key=None, max_tokens
                     continue
                 data = line[5:].strip()
                 if data == "[DONE]":
+                    got_done = True
                     break
                 chunk = json.loads(data)
                 usage = chunk.get("usage") or (chunk.get("x_groq") or {}).get("usage")
@@ -97,6 +99,8 @@ def stream_chat(messages, model, *, base_url=GROQ_BASE, api_key=None, max_tokens
                         parts.append(piece)
             res.text = "".join(parts)
             res.reasoning = "".join(rparts)
+            if not got_done and not res.error_kind:
+                res.error_kind = "truncated"   # stream closed without [DONE]: partial answer
     except httpx.TimeoutException:
         res.error_kind = "timeout"
     except httpx.HTTPError as e:
