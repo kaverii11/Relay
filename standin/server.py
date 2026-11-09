@@ -9,7 +9,7 @@ Every number comes from standin/calibration.json (built from real probe logs by
 standin/calibrate.py). Run:
     .venv/bin/uvicorn standin.server:app --port 8099
 Admin (scenario control):
-    POST /admin/config  {"rare_rate":0.1, "limits":{"itpm":3500}, "seed":1, ...}
+    POST /admin/config  {"profile":"evening", "rare_rate":0.1 (override), "limits":{"itpm":3500}, "seed":1, ...}
     POST /admin/exhaust {"model":"openai/gpt-oss-120b","limit":"tpd","leave":2000}
     POST /admin/reset   GET /admin/stats
 """
@@ -28,6 +28,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 ROOT = Path(__file__).resolve().parents[1]
 CAL = json.loads((ROOT / "standin/calibration.json").read_text())
+MODELS = list(CAL["profiles"][CAL["default_profile"]]["models"])
 V = lambda d: d["value"]  # noqa: E731
 
 # ---------------------------------------------------------------- limits
@@ -83,8 +84,9 @@ class State:
     def reset(self, seed=None):
         self.rng = random.Random(seed)
         self.cfg = {
-            "rare_rate": V(CAL["rare_delay"]["rate_default"]),
-            "rare_mult": V(CAL["rare_delay"]["multiplier"]),
+            # latency profile (K §25): "afternoon" (stage 2a) or "evening" (stage 2b, n=20); never pooled
+            "profile": CAL["default_profile"],
+            "rare_rate": None,          # None = the profile's measured rate; a number overrides it
             "slowdown": V(CAL["load_slowdown"]["per_inflight_fraction"]),
             "max_conc": V(CAL["load_slowdown"]["max_concurrency"]),
             "err_rate": V(CAL["failures"]["error_5xx_rate"]),
@@ -103,7 +105,7 @@ class State:
 
     def _build_buckets(self):
         self.buckets = {m: {k: Bucket(self.cfg["limits"][k], LIMIT_NAMES[k][1]) for k in LIMIT_NAMES}
-                        for m in CAL["models"]}
+                        for m in MODELS}
 
 
 S = State()
@@ -162,10 +164,13 @@ def ratelimit_headers(b):
 async def chat(req: Request):
     body = await req.json()
     model = body.get("model")
-    if model not in CAL["models"]:
+    if model not in MODELS:
         return JSONResponse(status_code=404, content={"error": {"message": f"model {model} not in stand-in"}})
     S.stats["requests"] += 1
-    cal = CAL["models"][model]
+    prof = CAL["profiles"][S.cfg["profile"]]
+    cal = prof["models"][model]
+    rare_rate = S.cfg["rare_rate"] if S.cfg["rare_rate"] is not None else V(prof["rare_delay"]["rate"])
+    rare_mults = V(prof["rare_delay"]["multipliers"])
     messages = body["messages"]
     n_in = est_tokens("".join(m["content"] for m in messages))
 
@@ -196,10 +201,10 @@ async def chat(req: Request):
             S.peak_inflight = max(S.peak_inflight, S.inflight)
             try:
                 load = 1 + S.cfg["slowdown"] * max(0, S.inflight - 4)
-                ttft = (V(cal["ttft_base_ms"]) + V(cal["ttft_ms_per_input_token"]) * n_in)
+                ttft = (V(cal["ttft_base_ms"]) + V(CAL["ttft_ms_per_input_token"]) * n_in)
                 ttft *= math.exp(rng.gauss(0, V(cal["ttft_lognormal_sigma"]))) * load
-                if rng.random() < S.cfg["rare_rate"]:
-                    ttft *= S.cfg["rare_mult"]
+                if rng.random() < rare_rate:
+                    ttft *= rng.choice(rare_mults)          # one of the measured slow-call multipliers
                     S.stats["rare"] += 1
                 gap = V(cal["reasoning_gap_ms"]) * load
                 await asyncio.sleep(max(0, ttft - gap) / 1000)          # wait before ANY token
@@ -243,6 +248,8 @@ async def config(req: Request):
         if k == "limits":
             S.cfg["limits"].update(v)
             S._build_buckets()
+        elif k == "profile" and v not in CAL["profiles"]:
+            return JSONResponse(status_code=400, content={"error": f"unknown profile {v}"})
         elif k in S.cfg:
             S.cfg[k] = v
     return {"cfg": S.cfg}

@@ -1,6 +1,7 @@
 #!/bin/sh
 # Run the stand-in scenarios ONE AFTER ANOTHER (K: parallel runs share CPU and pollute latency).
-# Full five at rare-delay 5%; burst + overload also at 2% and 10% (K, 2026-11-09).
+# Full five under the AFTERNOON stand-in profile (stage 2a, n=40); burst + overload also under the
+# EVENING profile (stage 2b, n=20), replacing the earlier 2%/10% slow-call repeats (K §25).
 # caffeinate -i keeps the Mac awake for the whole run. Starts its own stand-in on :8099.
 cd "$(dirname "$0")/.." || exit 1
 PY=.venv/bin/python
@@ -12,9 +13,9 @@ SRV=$!
 trap 'kill $SRV' EXIT
 sleep 4
 run() { echo "=== $(date '+%H:%M:%S') $*"; caffeinate -i $PY load/loadgen.py "$@" || echo "FAILED: $*"; }
-for sc in steady burst overload minute_limit_halved daily_exhausted; do run $sc --rare 0.05; done
-for r in 0.02 0.10; do run burst --rare $r; run overload --rare $r; done
+for sc in steady burst overload minute_limit_halved daily_exhausted; do run $sc --profile afternoon; done
+for sc in burst overload; do run $sc --profile evening; done
 # K: shadow-mode arrival check (measures false-busy) and halved limit without 429 learning
-run overload --rare 0.05 --arrival-check shadow --tag shadow
-run minute_limit_halved --rare 0.05 --no-learn --tag nolearn
+run overload --profile afternoon --arrival-check shadow --tag shadow
+run minute_limit_halved --profile afternoon --no-learn --tag nolearn
 echo "=== $(date '+%H:%M:%S') all done"

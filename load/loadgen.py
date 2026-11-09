@@ -1,6 +1,6 @@
 """Run one load scenario against the stand-in (or, at small scale, real Groq).
 
-  .venv/bin/python load/loadgen.py steady --port 8099 --rare 0.05 [--seed 1] [--smoke --draft-share 0.6]
+  .venv/bin/python load/loadgen.py steady --port 8099 [--profile afternoon|evening] [--seed 1] [--smoke --draft-share 0.6]
 
 Open-loop: the full arrival schedule is drawn up front from a seeded RNG and saved to
 raw/, then each question is submitted at its arrival time whether or not earlier ones
@@ -73,7 +73,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("scenario", choices=list(SCENARIOS))
     ap.add_argument("--port", type=int, default=8099)
-    ap.add_argument("--rare", type=float, default=0.05)
+    ap.add_argument("--profile", default="afternoon", choices=["afternoon", "evening"],
+                    help="stand-in latency profile (K §25): afternoon = stage 2a, evening = stage 2b (n=20)")
+    ap.add_argument("--rare", type=float, default=None, help="override the profile's measured slow-call rate")
     ap.add_argument("--setting", default="medium_rerank", choices=list(SETTINGS))
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--jitter", default="jitter", choices=["exact", "jitter"])
@@ -112,14 +114,15 @@ def main():
                    draft_rate_per_min_expected=[round(ph["draft_mult"] * CEILING_PER_MIN, 3) for ph in sc["phases"]],
                    arrivals_by_kind={k: sum(s[3] == k for s in sched) for k in ("fresh", "burst", "burst_repeat", "smoke")},
                    forced_repeats=sampler.forced_repeats if sampler else None, phase_minutes=phase_min)
-    name = f"{a.scenario}{('_' + a.tag) if a.tag else ''}_rare{a.rare}"
+    variant = a.tag                     # the profile is its own column, so it is not part of the variant
+    name = f"{a.scenario}{('_' + variant) if variant else ''}_{a.profile}" + (f"_rare{a.rare}" if a.rare is not None else "")
     stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
     run = f"{name}_{stamp}"
     (ROOT / "raw").mkdir(exist_ok=True)
 
     admin = f"http://127.0.0.1:{a.port}/admin"
     httpx.post(admin + "/reset", json={"seed": a.seed}).raise_for_status()
-    cfg = {"rare_rate": a.rare}
+    cfg = {"profile": a.profile, "rare_rate": a.rare}
     if sc.get("standin_limits"):
         cfg["limits"] = sc["standin_limits"]
     httpx.post(admin + "/config", json=cfg).raise_for_status()
@@ -145,8 +148,11 @@ def main():
     ret.search("warm-up query about attention heads")   # first inference is ~4x slower (723 vs 181 ms, smoke run)
     pl = Pipeline(base_url=f"http://127.0.0.1:{a.port}/v1", api_key="standin", source="stand-in",
                   setting=setting, policy=pol, limiter=lim, cache=ExactCache(), retriever=ret)
-    svc = Service(pl, workers=pol.workers, scenario=a.scenario, events_path=ROOT / f"raw/events_{run}.jsonl")
-    meta = {"run": run, "scenario": a.scenario, "desc": sc["desc"], "rare_rate": a.rare, "seed": a.seed,
+    prof_label = {"afternoon": "afternoon (2a, n=40)", "evening": "evening (2b, n=20)"}[a.profile]
+    svc = Service(pl, workers=pol.workers, scenario=a.scenario, events_path=ROOT / f"raw/events_{run}.jsonl",
+                  variant=variant, profile=prof_label)
+    meta = {"run": run, "scenario": a.scenario, "variant": variant, "standin_profile": a.profile,
+            "desc": sc["desc"], "rare_rate_override": a.rare, "seed": a.seed,
             "setting": setting.name, "policy": pol.as_dict(), "patience": PATIENCE, "n_arrivals": len(sched),
             "started": dt.datetime.now(dt.timezone.utc).isoformat(), "ceiling_per_min": CEILING_PER_MIN,
             "mix": mixinfo}

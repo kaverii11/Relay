@@ -91,7 +91,9 @@ def main(path):
     rows = list(csv.DictReader(open(path)))
     by = defaultdict(list)
     for r in rows:
-        by[(r["scenario"], r["source"], r["retrieval_setting"])].append(r)
+        lab = r["scenario"] + (f" [{r['run_variant']}]" if r.get("run_variant") else "")
+        src = r["source"] + (f", {r['standin_profile']}" if r.get("standin_profile") else "")
+        by[(lab, src, r["retrieval_setting"])].append(r)
 
     print("\nTable 2a: latency (ms). Percentiles over ALL requests; no token = +inf")
     print("| Scenario | Real or stand-in | Setting | Requests sent | Duration (s) | Offered rate (per min) | "

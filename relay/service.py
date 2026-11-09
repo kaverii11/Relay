@@ -22,12 +22,15 @@ COLUMNS = ["request_id", "scenario", "source", "start_time", "first_token_ms", "
            "service_start_ms", "gave_up", "degrade_level", "model", "calls",
            "tokens_in_120b", "tokens_out_120b", "tokens_in_20b", "tokens_out_20b", "rerank_ms",
            "reply_kind",   # answer | refusal | busy | none (gave up / error); cache hits keep their kind
-           "draft_ready_ms", "draft_sent_ms", "arrival_pred_draft_sent_ms", "arrival_busy_pred", "busy_path"]
+           "draft_ready_ms", "draft_sent_ms", "arrival_pred_draft_sent_ms", "arrival_busy_pred", "busy_path",
+           "run_variant",       # "" = main run; else e.g. shadow / nolearn / evening (tables group by it)
+           "standin_profile"]   # stand-in latency profile, with its n; "" for real Groq
 
 
 class Service:
-    def __init__(self, pipeline: Pipeline, *, workers: int, scenario: str, events_path: Path):
-        self.pl, self.scenario = pipeline, scenario
+    def __init__(self, pipeline: Pipeline, *, workers: int, scenario: str, events_path: Path,
+                 variant: str = "", profile: str = ""):
+        self.pl, self.scenario, self.variant, self.profile = pipeline, scenario, variant, profile
         self.q: queue.Queue = queue.Queue()
         self.rows, self.lock = [], threading.Lock()
         self.events_f = open(events_path, "a")
@@ -82,7 +85,8 @@ class Service:
                "rerank_ms": res.get("rerank_ms"),
                "reply_kind": res.get("kind") or "none",
                **{k: res.get(k) for k in ("draft_ready_ms", "draft_sent_ms", "arrival_pred_draft_sent_ms",
-                                          "arrival_busy_pred", "busy_path")}}
+                                          "arrival_busy_pred", "busy_path")},
+               "run_variant": self.variant, "standin_profile": self.profile}
         detail = {k: v for k, v in res.items() if k != "events"}
         with self.lock:
             self.rows.append(row)
