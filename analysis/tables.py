@@ -15,8 +15,10 @@ Definitions (DECISIONS §5, §7, K's percentile rule):
 - Tokens per answer: all tokens spent in the scenario (in + out, including failed requests)
   divided by the number of status=ok rows. Waste counts against the answers that got through.
 - Cost per 1,000 answers: $0 actually billed (free tier), and the cost at Groq's paid on-demand
-  prices (PRICES below, from the model pages, fetched 2026-11-09). All tokens spent in the
-  scenario (incl. failed requests) / successful (status=ok) answers x 1000. Output tokens include
+  prices (PRICES below, from the console model pages, fetched 2026-11-09). All tokens spent in the
+  scenario (incl. failed requests) / successful (status=ok) replies x 1000, then split by
+  reply_kind: drafted answers vs "the papers don't say" refusals (each kind's own tokens / its
+  count), with the refusal share of ok replies beside it. Output tokens include
   reasoning tokens (Groq reports reasoning inside completion_tokens; billed as output, K's rule).
   Cached input is priced at the full input rate (we don't record cache hits per call), so the
   paid figure slightly overstates real Groq.
@@ -111,7 +113,12 @@ def main(path):
         ok = sum(r["status"] == "ok" for r in rs)
         toks = sum(int(r["tokens_in"]) + int(r["tokens_out"]) for r in rs)
         tpa = f"{toks / ok:.0f}" if ok else "no answers"
-        cost = f"$0 billed (free tier); ${paid_cost(rs) / ok * 1000:.3f} at paid on-demand" if ok else "no answers"
+        okr = [r for r in rs if r["status"] == "ok"]
+        ans = [r for r in okr if r["reply_kind"] == "answer"]
+        ref = [r for r in okr if r["reply_kind"] == "refusal"]
+        per = lambda xs: f"${paid_cost(xs) / len(xs) * 1000:.3f}" if xs else "n/a"  # noqa: E731
+        cost = (f"$0 billed (free tier); paid on-demand: ${paid_cost(rs) / ok * 1000:.3f} all-in "
+                f"[drafted {per(ans)}, refusals {per(ref)}, refusal share {100 * len(ref) / ok:.1f}%]") if ok else "no answers"
         print(f"| {sc} ({src}) | {pc('ok'):.1f} | {pc('rate_limited'):.1f} | {pc('timeout'):.1f} | {pc('error'):.1f} | "
               f"{np.mean([int(r['retries']) for r in rs]):.2f} | {peak_queue(rs)} | {tpa} | {cost} |")
 
@@ -134,5 +141,14 @@ def main(path):
                   f"{pc('refused_wrongly'):.1f} | {toks:.0f} | {ft} | {tot} |")
 
 
+def footnote():
+    print("\nPrices: Groq on-demand, USD per 1M tokens: gpt-oss-120b $0.15 in / $0.60 out; gpt-oss-20b "
+          "$0.075 in / $0.30 out. Source: https://console.groq.com/docs/model/openai/gpt-oss-120b and "
+          "https://console.groq.com/docs/model/openai/gpt-oss-20b, read 2026-11-09 (pages show no date). "
+          "Older Groq posts list different output prices (K: $0.75 / $0.50); the console pages are used. "
+          "Reasoning tokens billed as output. Cached input priced at the full input rate.")
+
+
 if __name__ == "__main__":
     main(sys.argv[1] if len(sys.argv) > 1 else "results.csv")
+    footnote()

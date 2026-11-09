@@ -20,7 +20,8 @@ COLUMNS = ["request_id", "scenario", "source", "start_time", "first_token_ms", "
            "retries", "tokens_in", "tokens_out", "retrieval_setting", "answer_grade",
            # extras, after the brief's 12 (DECISIONS §5)
            "service_start_ms", "gave_up", "degrade_level", "model", "calls",
-           "tokens_in_120b", "tokens_out_120b", "tokens_in_20b", "tokens_out_20b", "rerank_ms"]
+           "tokens_in_120b", "tokens_out_120b", "tokens_in_20b", "tokens_out_20b", "rerank_ms",
+           "reply_kind"]   # answer | refusal | busy | none (gave up / error); cache hits keep their kind
 
 
 class Service:
@@ -77,7 +78,8 @@ class Service:
                "tokens_out_120b": res.get("by_model", {}).get("openai/gpt-oss-120b", [0, 0])[1],
                "tokens_in_20b": res.get("by_model", {}).get("openai/gpt-oss-20b", [0, 0])[0],
                "tokens_out_20b": res.get("by_model", {}).get("openai/gpt-oss-20b", [0, 0])[1],
-               "rerank_ms": res.get("rerank_ms")}
+               "rerank_ms": res.get("rerank_ms"),
+               "reply_kind": res.get("kind") or "none"}
         detail = {k: v for k, v in res.items() if k != "events"}
         with self.lock:
             self.rows.append(row)
