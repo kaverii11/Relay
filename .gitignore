@@ -5,6 +5,7 @@ papers/*.pdf
 *.pyc
 # written notes and data stay out of git (Kaveri, 2026-11-09)
 *.md
+!README.md
 probe/raw/
 raw/
 data/
