@@ -47,11 +47,11 @@ def lower_first(q):
     return q[0].lower() + q[1:] if q and not q[:2].isupper() else q
 
 
-def items(pool, n_probe, seed):
+def items(pool, n_probe, seed, sets=("eval", "tuning")):
     if any(not p["set"] for p in pool):
         sys.exit("set is blank: run eval/split.py first (K). Wording probes are drawn from TUNING questions only.")
     out = [{"id": p["id"], "kind": "k", "set": p["set"], "type": p.get("type", ""), "answerable": p["ans"], "q": p["q"]}
-           for p in pool]
+           for p in pool if p["set"] in sets]
     tuning = [p for p in pool if p["set"] == "tuning"]
     picks = random.Random(seed).sample(tuning, min(n_probe, len(tuning)))
     for i, (p, fr) in enumerate(zip(picks, FRAMINGS)):
@@ -70,10 +70,12 @@ def main():
     ap.add_argument("--gap", type=float, default=5.0, help="seconds between calls")
     ap.add_argument("--base-url", default=None, help="stand-in URL for a dry run (no ledger)")
     ap.add_argument("--out", type=Path, default=OUT)
+    ap.add_argument("--sets", default="eval,tuning",
+                    help="which of K's sets to rewrite; K 2026-11-10: tuning only (eval rewrites come from the eval run)")
     a = ap.parse_args()
 
     pool = load_pool(a.pool or POOL_PATH)
-    todo = items(pool, a.probes, a.seed)
+    todo = items(pool, a.probes, a.seed, tuple(x.strip() for x in a.sets.split(",")))
     done = json.loads(a.out.read_text()) if a.out.exists() else {}
     todo = [t for t in todo if match_key(t["q"]) not in done]         # resumable; never resend a stored one
     real = a.base_url is None
@@ -128,7 +130,13 @@ def main():
             break
         j = parse_json(r.text) if r.status == 200 else None
         sq = ((j or {}).get("search_query") or "").strip()
+        # valid JSON with an empty search_query: production searches with the raw question
+        # (relay/pipeline.py, understand step), so store exactly that, flagged
+        fallback = j is not None and not sq
+        if fallback:
+            sq = t["q"]
         rec = {**t, "status": r.status, "error_kind": r.error_kind, "text": r.text, "search_query": sq or None,
+               "empty_rewrite_fallback": fallback,
                "tokens_in": r.tokens_in, "tokens_out": r.tokens_out, "total_ms": round(r.total_ms or 0, 1),
                "model": SMALL, "temperature": 0.0, "reasoning_effort": pol.reasoning_effort,
                "source": "groq" if real else "stand-in",
@@ -136,7 +144,8 @@ def main():
         if sq:
             done[match_key(t["q"])] = rec
             a.out.write_text(json.dumps(done, indent=1))
-        print(f"  {i + 1}/{n} {t['id']}: {r.status} -> {sq[:90] if sq else '(no rewrite: ' + (r.error_kind or 'unparsed') + ')'}")
+        shown = "(empty search_query -> raw question, as production)" if fallback else sq[:90]
+        print(f"  {i + 1}/{n} {t['id']}: {r.status} -> {shown if sq else '(no rewrite: ' + (r.error_kind or 'unparsed') + ')'}")
         if i + 1 < n:
             time.sleep(a.gap)
     print(f"[rewrites] stored {len(done)} -> {a.out}")
