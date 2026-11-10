@@ -44,16 +44,16 @@ from relay.budget import CEILING, Budget, usage_24h  # noqa: E402
 from relay.config import BIG, SETTINGS, SMALL, Policy  # noqa: E402
 from relay.limiter import Limiter  # noqa: E402
 from relay.pipeline import DRAFT_OUT_EST, ExactCache, Pipeline, est_tokens  # noqa: E402
-from relay.prompts import check_messages  # noqa: E402
 from relay.retrieval import Retriever, cross_encoder  # noqa: E402
 from relay.service import Service, write_csv  # noqa: E402
 
 GROQ = "https://api.groq.com/openai/v1"
-# per-call sizes: understand measured (rewrites, n=45); draft in from the pipeline's own estimate, out measured
-# (stage 2a, 258); check NOT measured yet (estimated from the prompt; labelled "assumed" in the plan)
-UNDERSTAND_IN, UNDERSTAND_OUT = 415, 105
-DRAFT_OUT = 260
-CHECK_OUT = 60
+# per-call sizes, MEASURED on the evening e2e set (2026-11-10, 12 q): understand in p50 319 / out 98;
+# draft in p50 2502 (max 2796) / out p50 177 (max 245); check in p50 234 (max 280) / out p50 84 (max 98).
+# Rounded up a little so the plan stays conservative.
+UNDERSTAND_IN, UNDERSTAND_OUT = 340, 110
+DRAFT_OUT = 250
+CHECK_IN, CHECK_OUT = 280, 100
 
 
 def _pass_cands(pool):
@@ -178,7 +178,7 @@ def main():
     pl = Pipeline(base_url=a.base_url or GROQ, api_key="standin", source="stand-in" if not real else "groq",
                   setting=setting, policy=pol, limiter=lim, cache=ExactCache(), retriever=ret, budget=budget)
     draft_in = round(pl.draft_est(setting.k))
-    check_in = est_tokens(check_messages("x" * 120, "a" * 500, [{"chunk": "C1", "quote": "q" * 160}] * 3))
+    check_in = CHECK_IN
     # every question: understand (20b); only the predicted gate passes: draft (120b) + check (20b)
     exp = {SMALL: {"req": n + n_pass, "tok": n * (UNDERSTAND_IN + UNDERSTAND_OUT) + n_pass * (check_in + CHECK_OUT)},
            BIG: {"req": n_pass, "tok": n_pass * (draft_in + DRAFT_OUT)}}
@@ -196,7 +196,7 @@ def main():
         print(f"    {p['id']:4s} {'ans' if p['ans'] else 'un '}  gate ~{g:6.2f} {'draft  ' if g >= pol.gate_threshold else 'REFUSE '} {p['q']}")
     print(f"  --ids {','.join(p['id'] for p in qs)}")
     print(f"  per question: understand (20b ~{UNDERSTAND_IN}+{UNDERSTAND_OUT}) -> draft (120b ~{draft_in}+{DRAFT_OUT}) "
-          f"-> check (20b ~{check_in}+{CHECK_OUT}, ASSUMED: no check call measured yet); worst case +1 draft +1 check")
+          f"-> check (20b ~{check_in}+{CHECK_OUT}); all sizes measured on the evening set; worst case +1 draft +1 check")
     print(f"  requests: expected {exp[SMALL]['req'] + exp[BIG]['req']}, worst {worst[SMALL]['req'] + worst[BIG]['req']}; "
           f"run cap {cap}" + (" (NOT counted in the 300 probe cap, K §31)" if real else ""))
     u = usage_24h()
