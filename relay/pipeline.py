@@ -168,6 +168,7 @@ class Pipeline:
         self.base_url, self.api_key, self.source = base_url, api_key, source
         self.setting, self.p, self.lim, self.cache, self.ret = setting, policy, limiter, cache, retriever
         self.budget = budget      # relay.budget.Budget for real non-probe runs (K §31); None on the stand-in
+        self.keep_passages = False    # e2e sets (K §34): keep the passages the drafter saw + each draft's claims
         self.http = httpx.Client(timeout=None, limits=httpx.Limits(max_connections=200, max_keepalive_connections=50))
         # Requests that will need a draft but haven't reserved it yet (K: a SET of ids, not a counter,
         # so it can't drift and can be inspected). Added at arrival, removed when the draft is
@@ -214,7 +215,8 @@ class Pipeline:
             timeout = self.p.call_timeout_draft_s if kind == "draft" else self.p.call_timeout_short_s
             timeout = max(0.5, min(timeout, (ctx.deadline_ms - ctx.ms()) / 1000))
             extra = {"reasoning_effort": effort or self.p.reasoning_effort}
-            ctx.ev("call_start", step=kind, model=model, attempt=attempt, est_in=n_in)
+            ctx.ev("call_start", step=kind, model=model, attempt=attempt, est_in=n_in,
+                   limiter_wait_s=round(wait, 3), limiter_binding=binding)     # K §34: limiter wait per call
             r = stream_chat(messages, model, base_url=self.base_url, api_key=self.api_key,
                             max_tokens=800 if kind == "draft" else 400, timeout_s=timeout,
                             client=self.http, extra=extra)
@@ -314,6 +316,9 @@ class Pipeline:
                    gate_rewrite=None if gate_rw is None else round(gate_rw, 3),
                    hits=[h.chunk.cite() for h in hits])
 
+            if self.keep_passages:
+                out["passages"] = [{"cite": h.chunk.cite(), "bm25": round(h.bm25, 2), "ce": round(h.ce, 3),
+                                    "text": h.chunk.text} for h in hits[:self.setting.k]]
             # [3] decide: refuse if the evidence isn't there (K §29 cutoff on the gate above)
             if gate < self.p.gate_threshold:
                 return self._refuse(ctx, out, hits, "gate")
@@ -326,6 +331,8 @@ class Pipeline:
             if level != "full":
                 out["degrade_level"] = level
             use = hits[:k]
+            if self.keep_passages:
+                out["passages"] = out["passages"][:k]
 
             # [4] draft  -> [5] check, with ONE redraft loop
             feedback = None
@@ -346,12 +353,14 @@ class Pipeline:
                 if d is None:
                     feedback = "Output was not valid JSON."
                     continue
+                if self.keep_passages:
+                    ctx.ev("draft_out", round=round_, model=model, draft=d)
                 if d.get("not_in_papers"):
                     return self._refuse(ctx, out, use, "drafter")
                 ok, why = self._code_check(d, use)
                 if ok and self._needs_model_check(hints):
                     ok, why = self._model_check(ctx, d, use)
-                ctx.ev("check", round=round_, ok=ok, why=why)
+                ctx.ev("check", round=round_, ok=ok, why=why, redraft=round_ == 1)
                 if ok:
                     out["answer"] = self._render(d["answer"], use)
                     out["citations"] = sorted({use[int(c["chunk"][1:]) - 1].chunk.cite() for c in d["claims"]})
