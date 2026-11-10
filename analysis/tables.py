@@ -149,8 +149,8 @@ def main(path):
     if graded:
         print("\nTable 3: retrieval settings (real Groq, graded rows only)")
         print("| Setting | Questions asked | Correct and cited % | Wrong % | Correctly refused % | (Refused wrongly %) | "
-              "Tokens per answer | First token p50 / p95 (ms) | Total time p50 / p95 (ms) |")
-        print("|---|---|---|---|---|---|---|---|---|")
+              "Tokens per answer | First token p50 / p95 (ms) | Total time p50 / p95 (ms) | Limiter wait p50 / max (ms) |")
+        print("|---|---|---|---|---|---|---|---|---|---|")
         g = defaultdict(list)
         for r in graded:
             g[r["retrieval_setting"]].append(r)
@@ -158,10 +158,13 @@ def main(path):
             n = len(rs)
             pc = lambda s: 100 * sum(r["answer_grade"] == s for r in rs) / n  # noqa: E731
             toks = np.mean([int(r["tokens_in"]) + int(r["tokens_out"]) for r in rs])
-            ft = pcts([f(r["first_token_ms"]) for r in rs], (50, 95))
-            tot = pcts([f(r["total_ms"]) if r["status"] == "ok" else None for r in rs], (50, 95))
+            # K §41: Table 3 latency EXCLUDES our own limiter's planned waits; the wait is its own column
+            lw = [f(r.get("limiter_wait_ms")) or 0.0 for r in rs]
+            ft = pcts([None if f(r["first_token_ms"]) is None else f(r["first_token_ms"]) - w for r, w in zip(rs, lw)], (50, 95))
+            tot = pcts([f(r["total_ms"]) - w if r["status"] == "ok" else None for r, w in zip(rs, lw)], (50, 95))
+            wl = sorted(lw)
             print(f"| {st} | {n} | {pc('correct'):.1f} | {pc('wrong'):.1f} | {pc('refused_correctly'):.1f} | "
-                  f"{pc('refused_wrongly'):.1f} | {toks:.0f} | {ft} | {tot} |")
+                  f"{pc('refused_wrongly'):.1f} | {toks:.0f} | {ft} | {tot} | {wl[len(wl) // 2]:.0f} / {wl[-1]:.0f} |")
 
 
 def footnote():

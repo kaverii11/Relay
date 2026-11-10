@@ -21,6 +21,7 @@ COLUMNS = ["request_id", "scenario", "source", "start_time", "first_token_ms", "
            # extras, after the brief's 12 (DECISIONS §5)
            "service_start_ms", "gave_up", "degrade_level", "model", "calls",
            "tokens_in_120b", "tokens_out_120b", "tokens_in_20b", "tokens_out_20b", "rerank_ms",
+           "limiter_wait_ms", "tokens_cached",   # K §41: our limiter's waits (Table 3 excludes them); Groq cached prompt tokens
            "reply_kind",   # answer | refusal | busy | none (gave up / error); cache hits keep their kind
            "draft_ready_ms", "draft_sent_ms", "arrival_pred_draft_sent_ms", "arrival_busy_pred", "busy_path",
            "run_variant",       # "" = main run; else e.g. shadow / nolearn / evening (tables group by it)
@@ -83,6 +84,7 @@ class Service:
                "tokens_in_20b": res.get("by_model", {}).get("openai/gpt-oss-20b", [0, 0])[0],
                "tokens_out_20b": res.get("by_model", {}).get("openai/gpt-oss-20b", [0, 0])[1],
                "rerank_ms": res.get("rerank_ms"),
+               "limiter_wait_ms": res.get("limiter_wait_ms"), "tokens_cached": res.get("tokens_cached"),
                "reply_kind": res.get("kind") or "none",
                **{k: res.get(k) for k in ("draft_ready_ms", "draft_sent_ms", "arrival_pred_draft_sent_ms",
                                           "arrival_busy_pred", "busy_path")},

@@ -15,6 +15,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import math
+from pathlib import Path
 import random
 import re
 import threading
@@ -123,6 +124,8 @@ class Ctx:
     arrival_pred_draft_sent_ms: float | None = None
     arrival_busy_pred: int | None = None     # 1 = the arrival check said busy (acted on, or shadow only)
     busy_path: str = ""                      # arrival | mid | queue
+    tokens_cached: int = 0                   # prompt tokens Groq served from its cache (K, eval: logged per call)
+    limiter_wait_ms: float = 0.0             # our own limiter's planned waits, summed (Table 3 excludes it, K)
     tokens_in: int = 0
     tokens_out: int = 0
     events: list = field(default_factory=list)
@@ -172,6 +175,8 @@ class Pipeline:
         self.setting, self.p, self.lim, self.cache, self.ret = setting, policy, limiter, cache, retriever
         self.budget = budget      # relay.budget.Budget for real non-probe runs (K §31); None on the stand-in
         self.keep_passages = False    # e2e sets (K §34): keep the passages the drafter saw + each draft's claims
+        self.daily_dump = None        # eval (K §41): Path -> on a per-day 429 save body + headers there, no ladder
+        self.daily_hit = None
         self.http = httpx.Client(timeout=None, limits=httpx.Limits(max_connections=200, max_keepalive_connections=50))
         # Requests that will need a draft but haven't reserved it yet (K: a SET of ids, not a counter,
         # so it can't drift and can be inspected). Added at arrival, removed when the draft is
@@ -209,6 +214,7 @@ class Pipeline:
                 with self.qlock:
                     self.queued_drafts.discard(ctx.rid)    # its tokens now live in the limiter's buckets
             ctx.sleep(wait + 0.05 if wait > 0 else 0, "waiting")
+            ctx.limiter_wait_ms += wait * 1000
             if kind == "draft" and ctx.draft_sent_ms is None:
                 ctx.draft_sent_ms = ctx.ms()
             self.lim.note_request(is_retry=attempt > 0)
@@ -229,6 +235,7 @@ class Pipeline:
                 self.budget.record(model, r.tokens_in, r.tokens_out, r.status)
             ctx.tokens_in += r.tokens_in
             ctx.tokens_out += r.tokens_out          # completion_tokens: reasoning is inside it (measured, stage 1)
+            ctx.tokens_cached += r.cached_tokens
             mt = ctx.by_model.setdefault(model, [0, 0])
             mt[0] += r.tokens_in
             mt[1] += r.tokens_out
@@ -236,7 +243,7 @@ class Pipeline:
             ctx.ev("call_end", step=kind, model=model, attempt=attempt, status=r.status,
                    err=r.error_kind, limit=lk, first_any_ms=r.first_any_ms, ttft_ms=r.ttft_ms,
                    work_ms=round(r.total_ms, 1), tokens_in=r.tokens_in, tokens_out=r.tokens_out,
-                   retry_after=r.headers.get("retry-after"))
+                   cached_tokens=r.cached_tokens, retry_after=r.headers.get("retry-after"))
             if r.status == 200 and not r.error_kind:
                 return r
             # ---- failure: decide whether to retry
@@ -245,6 +252,11 @@ class Pipeline:
                 if m and self.lim.learn(model, lk, int(m.group(1))):
                     ctx.ev("limit_learned", model=model, limit=lk, value=int(m.group(1)))
             if r.status == 429 and lk in ("rpd", "tpd"):
+                if self.daily_dump is not None:           # K §41 (eval): keep the whole reply, then stop; no retry
+                    self.daily_hit = {"wall": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+                                      "model": model, "limit": lk, "status": r.status, "step": kind,
+                                      "headers": dict(r.headers), "body": r.error_body}
+                    Path(self.daily_dump).write_text(json.dumps(self.daily_hit, indent=2))
                 raise DailyLimit(model, lk)               # never retry a per-day limit
             retryable = r.status == 429 or r.status >= 500 or r.error_kind in ("network", "truncated") \
                 or (r.error_kind == "timeout" and kind != "draft" and attempt == 0)
@@ -344,7 +356,7 @@ class Pipeline:
                     r = self.call_model(ctx, model, draft_messages(ctx.question, use, feedback), "draft",
                                         out_est=DRAFT_OUT_EST)
                 except DailyLimit as e:
-                    if model == BIG:                     # per-day limit on 120b: drop to 20b (separate quota)
+                    if model == BIG and self.daily_hit is None:   # per-day limit on 120b: drop to 20b (separate quota); not in stop mode
                         ctx.ev("ladder", to="small_model", why=e.kind)
                         model, out["degrade_level"] = SMALL, "small_model"
                         r = self.call_model(ctx, model, draft_messages(ctx.question, use, feedback), "draft",
@@ -525,6 +537,7 @@ class Pipeline:
                 "tokens_in": ctx.tokens_in, "tokens_out": ctx.tokens_out, "events": ctx.events,
                 "service_start_ms": None if ctx.service_start_ms is None else round(ctx.service_start_ms, 1),
                 "by_model": ctx.by_model, "rerank_ms": ctx.rerank_ms,
+                "tokens_cached": ctx.tokens_cached, "limiter_wait_ms": round(ctx.limiter_wait_ms, 1),
                 **{k: (None if getattr(ctx, k) is None else (round(getattr(ctx, k), 1) if isinstance(getattr(ctx, k), float) else getattr(ctx, k)))
                    for k in ("draft_ready_ms", "draft_sent_ms", "arrival_pred_draft_sent_ms", "arrival_busy_pred")},
                 "busy_path": ctx.busy_path}
