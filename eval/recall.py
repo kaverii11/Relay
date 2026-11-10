@@ -86,12 +86,13 @@ def main():
     rows = [p for p in load_pool() if p["set"] == "tuning" and p["meta"].get("paper", "").strip()
             and p["meta"].get("page", "").strip()]
     res = {q: {m: [] for m in ("bm25", "embed", "hybrid", "prod")} for q in ("rewrite", "raw")}
-    detail = []
+    detail, maxrule = [], []
     for p in rows:
         groups = labelled(p, chunks)
         if not groups:
             continue
         rec = rw.get(match_key(p["q"]))
+        prod = {}
         for qk, q in (("rewrite", rec["search_query"] if rec else p["q"]), ("raw", p["q"])):
             bm = ret.bm.get_scores(_tok(q))
             r_bm = list(np.argsort(-bm))
@@ -102,15 +103,19 @@ def main():
                 for r, i in enumerate(ranked, 1):
                     rrf[i] += 1 / (RRF_K + r)
             r_hy = list(np.argsort(-rrf))
-            hits, _, _ = ret.search(q, k=6)
+            hits, gate, _ = ret.search(q, k=6)
             ids = {id(c): i for i, c in enumerate(chunks)}
             r_pr = [ids[id(h.chunk)] for h in hits]
             for m, ranked in (("bm25", r_bm), ("embed", r_em), ("hybrid", r_hy)):
                 res[qk][m].append((found(groups, ranked, 6), found(groups, ranked, 20)))
             res[qk]["prod"].append((found(groups, r_pr, 6), None))
+            prod[qk] = (found(groups, r_pr, 6), gate)
             if qk == "rewrite":
                 detail.append((p["id"], len(groups), first_rank(groups, r_bm), first_rank(groups, r_em),
                                first_rank(groups, r_hy), found(groups, r_pr, 6), q))
+        # K §29 production rule: the drafter gets the passages of whichever query scored higher
+        win = "rewrite" if prod["rewrite"][1] >= prod["raw"][1] else "raw"
+        maxrule.append((prod[win][0], win))
 
     n = len(detail)
     print(f"Recall on {n} tuning questions with a labelled passage; pieces w{a.words} ({len(chunks)} pieces); "
@@ -123,6 +128,9 @@ def main():
             r20 = "-" if m == "prod" else f"{sum(x[1] for x in v)}/{len(v)}"
             label = "prod (BM25 top-20 -> cross-encoder top-6)" if m == "prod" else m
             print(f"| {qk} | {label} | {r6}/{len(v)} | {r20} |")
+    nw = sum(w == "rewrite" for _, w in maxrule)
+    print(f"| max(raw, rewrite) | prod, passages from the higher-scoring query (K §29) "
+          f"| {sum(f for f, _ in maxrule)}/{len(maxrule)} | - |   (rewrite won {nw}, raw won {len(maxrule) - nw})")
     print("\nPer question, rewritten query: rank of the labelled piece (cross-paper: rank at which the LAST paper appears)")
     print("| id | papers | bm25 rank | embed rank | hybrid rank | in prod top-6 | query |\n|---|---|---|---|---|---|---|")
     for d in sorted(detail, key=lambda d: (d[2] or 9999)):

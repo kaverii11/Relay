@@ -30,8 +30,10 @@ SETTINGS = {
 class Policy:
     # --- "fast" (DECISIONS §1): PLACEHOLDERS until the end-to-end pipeline is measured
     system_deadline_ms: float = 10000      # PLACEHOLDER: send the busy reply rather than work past this
-    # --- refusal gate (DECISIONS §12): PLACEHOLDER until K's tuning questions exist
-    gate_threshold: float = 3.0            # cross-encoder score on the rewritten query
+    # --- refusal gate (DECISIONS §29, K 2026-11-10): K's midpoint rule on max(raw, rewrite), tuning questions only
+    gate_threshold: float = 0.875          # midpoint of highest refuse 0.354 (Q51) and lowest answerable above it 1.395 (Q42)
+    gate_input: str = "max"                # "max": cross-encoder on the raw question AND the rewrite; the higher score is the
+                                           # gate and the drafter gets that query's passages. "rewrite": rewrite only.
     # --- retries (DECISIONS §3)
     max_retries_per_question: int = 2
     retry_budget_fraction: float = 0.10    # PLACEHOLDER: retries <= 10% of requests in last 60 s

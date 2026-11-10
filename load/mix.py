@@ -148,17 +148,21 @@ def load_rewrites():
 
 def _scores(pool):
     """Gate score of the query the stand-in will actually search with (rewrite or raw)."""
-    from relay.config import SETTINGS
+    from relay.config import SETTINGS, Policy
     from relay.retrieval import Retriever, cross_encoder
     ret = Retriever(SETTINGS["medium_rerank"])          # the setting the load scenarios use (loadgen default)
     cross_encoder()
     ret.search("warm-up query about attention heads")
     rw = load_rewrites()
     sc, used_rw = {}, 0
+    gate_input = Policy().gate_input
     for p in pool:
         q, is_rw = stand_in_query(p, rw)
         used_rw += is_rw
-        sc[p["id"]] = ret.search(q)[1]
+        g = ret.search(q)[1]
+        if gate_input == "max" and is_rw:      # production gate = max(raw, rewrite) (K §29); raw-only rows unchanged
+            g = max(g, ret.search(p["q"])[1])
+        sc[p["id"]] = g
     k = [p for p in pool if p["set"] != "variant"]
     if rw and used_rw < len(k):
         print(f"  WARNING: only {used_rw} of {len(k)} K questions have a stored rewrite; the rest scored raw")
@@ -207,7 +211,8 @@ def main():
         return sum(sc[p["id"]] >= cut for p in items) / max(1, len(items))
     groups = {g: [p for p in pool if (p["set"] == "variant") == (g == "variant")] for g in ("k", "variant")}
     out = {name: {
-        "gate_threshold": cut, "query": "stored 20b rewrite where available, else raw", "n_rewritten": used_rw,
+        "gate_threshold": cut, "gate_input": Policy().gate_input,
+        "query": "max(raw question, stored 20b rewrite) where a rewrite exists, else raw (K §29)", "n_rewritten": used_rw,
         # over the WHOLE load pool, every item scored on its own
         "pass_answerable": share([p for p in pool if p["ans"]]),
         "pass_unanswerable": share([p for p in pool if not p["ans"]]),

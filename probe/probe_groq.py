@@ -70,10 +70,12 @@ _lock = __import__("threading").Lock()
 def _spend_one():
     """Count every request before it is sent; refuse past the cap. Persisted across runs."""
     with _lock:
-        n = json.loads(LEDGER.read_text())["sent"] if LEDGER.exists() else 0
+        d = json.loads(LEDGER.read_text()) if LEDGER.exists() else {}
+        n = d.get("sent", 0)
         if n >= HARD_CAP:
             raise SystemExit(f"probe hard cap reached ({n}/{HARD_CAP}) - raise HARD_CAP deliberately")
-        LEDGER.write_text(json.dumps({"sent": n + 1}))
+        d["sent"] = n + 1                 # other keys (relay/budget.py "calls") are kept
+        LEDGER.write_text(json.dumps(d))
 
 
 def call(log, model, n_chars, max_tokens, tag, client=None, messages=None, extra=None, meta=None):

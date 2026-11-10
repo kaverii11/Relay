@@ -1,0 +1,121 @@
+id,parent_id,question,answerable,author
+V01a,Q1,What human conversational response time do the Moshi authors benchmark their latency against?,yes,assistant
+V01b,Q1,average response time in natural human conversation that Moshi's latency is compared to,yes,assistant
+V02a,Q2,"With only a 32k vocabulary, how does Helium's tokenizer make sure no information is lost?",yes,assistant
+V02b,Q2,"Helium tokenizer, 32k vocab: what mechanism prevents information loss?",yes,assistant
+V03a,Q3,"List the stride of each of the four conv blocks in the Mimi encoder, before its last 1D convolution.",yes,assistant
+V03b,Q3,Mimi encoder: what striding factors do the four convolutional blocks use?,yes,assistant
+V04a,Q4,"In Mimi training, when quantization is skipped, what does the decoder receive as input?",yes,assistant
+V04b,Q4,What goes into the codec decoder when quantization isn't applied during training?,yes,assistant
+V05a,Q5,"Does the Depth Transformer use the same weights for every codebook level, or different ones?",yes,assistant
+V05b,Q5,Are the Depth Transformer's weights shared across the audio code levels?,yes,assistant
+V06a,Q6,Which tool upsamples the Fisher conversations to the sample rate Moshi needs?,yes,assistant
+V06b,Q6,How did they raise the Fisher dataset to the needed sample rate?,yes,assistant
+V07a,Q7,"On MMLU, what's the gap between Helium and Mistral?",yes,assistant
+V07b,Q7,Helium vs Mistral on MMLU: how many points lower is Helium?,yes,assistant
+V08a,Q8,"At 1.5kbps, what MUSHRA score does Zhang's baseline tokenizer get?",yes,assistant
+V08b,Q8,MUSHRA at 1.5 kbps for the Zhang et al. tokenizer baseline?,yes,assistant
+V09a,Q9,"After multi-stream instruct tuning, what MMLU does Moshi get with W4A8 quantization at block size 32?",yes,assistant
+V09b,Q9,"Moshi (multi-stream instruct) MMLU score, 4-bit weights W4A8, block size 32?",yes,assistant
+V10a,Q10,What's the reason for the 1e-4 flatness threshold when detecting repetitive text?,no,assistant
+V10b,Q10,Repetitive text detection: why a flatness threshold of 1e-4?,no,assistant
+V11a,Q11,"Under a pink noise attack, does Audioseal or the Kirchenbauer watermark detect better?",no,assistant
+V11b,Q11,Audioseal vs Kirchenbauer watermarking under pink noise: which has the higher detection score?,no,assistant
+V12a,Q12,"For zero-shot TTS, what target padding-token fraction is used to control speech rate?",no,assistant
+V12b,Q12,What exact padding fraction do they aim for when controlling speech rate in zero-shot TTS?,no,assistant
+V13a,Q13,"In the base Transformer, what's the inner dimension of the position-wise feed-forward layer?",yes,assistant
+V13b,Q13,Base model feed-forward network inner-layer size?,yes,assistant
+V14a,Q14,"In the base Transformer, what dropout is applied to the embedding plus positional encoding sums?",yes,assistant
+V14b,Q14,"Dropout rate on the sum of embeddings and positional encodings, base model?",yes,assistant
+V15a,Q15,How many parallel attention heads does the base Transformer have per layer?,yes,assistant
+V15b,Q15,Number of attention heads per layer in the base model?,yes,assistant
+V16a,Q16,"Which optimizer did they train with, and what epsilon did they set?",yes,assistant
+V16b,Q16,optimizer and epsilon value?,yes,assistant
+V17a,Q17,Training time in hours for the base translation model on 8 GPUs?,yes,assistant
+V17b,Q17,"How long, in hours, did the base model take to train on eight GPUs?",yes,assistant
+V18a,Q18,"For one convolutional layer with kernel width k smaller than n, what's the maximum path length?",yes,assistant
+V18b,Q18,"Maximum path length, single convolutional layer, kernel width k < n?",yes,assistant
+V19a,Q19,What's the reason for scaling the dot products in scaled dot-product attention?,yes,assistant
+V19b,Q19,Why scale the dot products in the attention function?,yes,assistant
+V20a,Q20,What's the reason the base English-to-German model uses a 1024 embedding size?,no,assistant
+V20b,Q20,Base EN-DE translation model: why an embedding size of 1024?,no,assistant
+V21a,Q21,What sampling temperature is used at inference for English-to-German translation?,no,assistant
+V21b,Q21,EN-DE translation inference: exact sampling temperature?,no,assistant
+V22a,Q22,"In wall-clock time on 8 P100 GPUs, is a Transformer self-attention layer faster than a ByteNet convolutional layer?",no,assistant
+V22b,Q22,Transformer self-attention vs ByteNet convolution: which is faster in wall-clock time on 8 P100s?,no,assistant
+V23a,Q23,"For semi-supervised English constituency parsing, which Transformer variant is used and what F1 does it reach?",yes,assistant
+V23b,Q23,"English constituency parsing, semi-supervised: model variant and F1 score?",yes,assistant
+V24a,Q24,How are parameters shared by the two linear transformations of the feed-forward network?,yes,assistant
+V24b,Q24,Feed-forward network's two linear transformations: what is shared across positions and what differs between layers?,yes,assistant
+V25a,Q25,"In the 2-stage H-Net, what target downsampling ratio does the first stage use?",yes,assistant
+V25b,Q25,"First-stage downsampling target ratio, two-stage H-Net?",yes,assistant
+V26a,Q26,"During dechunking, which function smooths the interpolation between chunks?",yes,assistant
+V26b,Q26,Upsampling in H-Net: what function creates the smooth interpolation between chunks?,yes,assistant
+V27a,Q27,Distilled 1-stage H-Net: what's its 5-shot MMLU accuracy?,yes,assistant
+V27b,Q27,MMLU (5-shot) accuracy of the distilled H-Net (1-stage)?,yes,assistant
+V28a,Q28,What's the purpose of the straight-through estimator in dechunking?,yes,assistant
+V28b,Q28,Why does the dechunking step use a straight-through estimator?,yes,assistant
+V29a,Q29,"At the GPT-3 Large scale, after how many training bytes does the 2-stage H-Net beat the BPE Transformer on validation BPB?",yes,assistant
+V29b,Q29,Crossover point in training bytes where H-Net (2-stage) overtakes the tokenized Transformer at Large scale?,yes,assistant
+V30a,Q30,"In the 2-stage H-Net ablation, what layer configuration did the hybrid main network have?",yes,assistant
+V30b,Q30,"Hybrid main network vs pure Transformer, two-stage model: what layers did the hybrid use?",yes,assistant
+V31a,Q31,"For the Chinese experiments, what tokenizer replaces GPT-2's for the baseline Transformer?",yes,assistant
+V31b,Q31,Chinese language modeling: which tokenizer does the Transformer baseline use instead of GPT-2's?,yes,assistant
+V32a,Q32,What's the reasoning behind the N=8 compression target in the 1-stage H-Net?,no,assistant
+V32b,Q32,One-stage H-Net: why a target compression ratio of 8?,no,assistant
+V33a,Q33,By what exact percentage does dynamic chunking slow training compared with an isotropic Transformer?,no,assistant
+V33b,Q33,"Training-time overhead of dynamic chunking vs a standard isotropic Transformer, as a percentage?",no,assistant
+V34a,Q34,"On the Chinese dataset, is 2-stage H-Net faster or slower at inference than the Block Transformer?",no,assistant
+V34b,Q34,2-stage H-Net vs Block Transformer inference wall-clock speed on Chinese?,no,assistant
+V35a,Q35,"In the chunking-layer compression ablation, what alternatives were compared against the default Downsample?",yes,assistant
+V35b,Q35,Which compression methods was H-Net's default Downsample operation tested against?,yes,assistant
+V36a,Q36,"For the HG38 DNA experiments, what learning rate was used at base-pair resolution?",yes,assistant
+V36b,Q36,DNA modeling on HG38: learning rate for the base-pair-resolution modules?,yes,assistant
+V37a,Q37,"At its 12.5 Hz frame rate, how many quantizers does Mimi use per frame?",yes,assistant
+V37b,Q37,Mimi codec: number of quantizers per 12.5 Hz frame?,yes,assistant
+V38a,Q38,Which data was Helium fine-tuned on to make it conversational?,yes,assistant
+V38b,Q38,Helium conversational fine-tuning: what dataset?,yes,assistant
+V39a,Q39,"For English-to-French, what dropout did the big Transformer use?",yes,assistant
+V39b,Q39,"Transformer (big), EN-FR translation: dropout rate?",yes,assistant
+V40a,Q40,Size in sentence pairs of the WMT 2014 English-German training set?,yes,assistant
+V40b,Q40,How many sentence pairs does the WMT 2014 EN-DE dataset contain?,yes,assistant
+V41a,Q41,Which dataset were the Chinese language models trained on?,yes,assistant
+V41b,Q41,Chinese language modeling: training dataset?,yes,assistant
+V42a,Q42,What learning-rate scheduler does H-Net use with AdamW?,yes,assistant
+V42b,Q42,H-Net training: scheduler used together with AdamW?,yes,assistant
+V43a,Q43,"What does ""XAttn"" mean in the chunking-layer ablation?",yes,assistant
+V43b,Q43,Chunking layer ablation: meaning of XAttn?,yes,assistant
+V44a,Q44,"What's the price per 1,000 tokens for Moshi's API?",no,assistant
+V44b,Q44,Moshi API pricing per 1k tokens?,no,assistant
+V45a,Q45,Helium's SQuAD 2.0 exact-match score?,no,assistant
+V45b,Q45,"On SQuAD 2.0, what EM does Helium reach?",no,assistant
+V46a,Q46,Where was the live Moshi demo hosted: which cloud provider?,no,assistant
+V46b,Q46,Moshi web demo hosting: which cloud provider?,no,assistant
+V47a,Q47,How is the CLIP vision encoder connected to Helium for multimodal tasks?,no,assistant
+V47b,Q47,Moshi + CLIP vision encoder: how are they integrated?,no,assistant
+V48a,Q48,Transformer's validation perplexity on GLUE?,no,assistant
+V48b,Q48,What perplexity does the Transformer get on the GLUE benchmark?,no,assistant
+V49a,Q49,Self-attention performance of the Transformer on TPUv4?,no,assistant
+V49b,Q49,How well does Transformer self-attention run on TPUv4 accelerators?,no,assistant
+V50a,Q50,Which PyTorch version does tensor2tensor use?,no,assistant
+V50b,Q50,tensor2tensor codebase: PyTorch version?,no,assistant
+V51a,Q51,How much faster is the quantized base Transformer on mobile devices?,no,assistant
+V51b,Q51,Latency gains from quantizing the base Transformer for mobile deployment?,no,assistant
+V52a,Q52,H-Net results on financial time series such as stock prices?,no,assistant
+V52b,Q52,How well does H-Net model stock-price time-series data?,no,assistant
+V53a,Q53,H-Net RLHF: human preference win rates?,no,assistant
+V53b,Q53,What win rates did H-Net get in human preference evaluations during RLHF?,no,assistant
+V54a,Q54,Which products use H-Net in production?,no,assistant
+V54b,Q54,Commercial deployments of the H-Net architecture?,no,assistant
+V55a,Q55,Capital city of France?,no,assistant
+V55b,Q55,Which city is France's capital?,no,assistant
+V56a,Q56,"On 5-shot MMLU, is Helium or the distilled 1-stage H-Net better?",yes,assistant
+V56b,Q56,Helium vs distilled H-Net (1-stage): 5-shot MMLU comparison?,yes,assistant
+V57a,Q57,Compare the optimizer and learning-rate schedule of the original Transformer with H-Net's.,yes,assistant
+V57b,Q57,Transformer vs H-Net: same optimizer and LR schedule?,yes,assistant
+V58a,Q58,How does Helium's positional encoding differ from the original Transformer's?,yes,assistant
+V58b,Q58,Positional encoding in Helium vs the original Transformer?,yes,assistant
+V59a,Q59,Which learning rate was used for training?,yes,assistant
+V59b,Q59,learning rate?,yes,assistant
+V60a,Q60,"With many simultaneous users on a single GPU, what latency does Moshi achieve?",no,assistant
+V60b,Q60,Moshi latency under concurrent load on one GPU?,no,assistant

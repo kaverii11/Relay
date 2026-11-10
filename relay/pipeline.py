@@ -140,11 +140,34 @@ class Ctx:
         self.ev(why + "_end")
 
 
+class _Async:
+    """Run fn on a thread now; .result() joins and re-raises. Used for the raw-question retrieval pass,
+    which overlaps the understand call (K §29: local, no tokens, ~220 ms measured)."""
+
+    def __init__(self, fn):
+        self.r = self.e = None
+        self.t = threading.Thread(target=self._run, args=(fn,), daemon=True)
+        self.t.start()
+
+    def _run(self, fn):
+        try:
+            self.r = fn()
+        except Exception as e:   # noqa: BLE001
+            self.e = e
+
+    def result(self):
+        self.t.join()
+        if self.e:
+            raise self.e
+        return self.r
+
+
 class Pipeline:
     def __init__(self, *, base_url, api_key, source, setting: RetrievalSetting, policy: Policy,
-                 limiter: Limiter, cache: ExactCache | None, retriever: Retriever):
+                 limiter: Limiter, cache: ExactCache | None, retriever: Retriever, budget=None):
         self.base_url, self.api_key, self.source = base_url, api_key, source
         self.setting, self.p, self.lim, self.cache, self.ret = setting, policy, limiter, cache, retriever
+        self.budget = budget      # relay.budget.Budget for real non-probe runs (K §31); None on the stand-in
         self.http = httpx.Client(timeout=None, limits=httpx.Limits(max_connections=200, max_keepalive_connections=50))
         # Requests that will need a draft but haven't reserved it yet (K: a SET of ids, not a counter,
         # so it can't drift and can be inspected). Added at arrival, removed when the draft is
@@ -169,6 +192,8 @@ class Pipeline:
             max_wait = max(0.0, (left_ms - EXPECTED_WORK_MS.get(kind, 550)) / 1000)
             if kind == "draft" and ctx.draft_ready_ms is None:
                 ctx.draft_ready_ms = ctx.ms()
+            if self.budget is not None:          # real-run caps (K §31), checked before anything is spent
+                self.budget.reserve(model, n_in, out_est)
             wait, binding, ok = self.lim.acquire(model, n_in, out_est, max_wait)
             if not ok:
                 if binding in ("rpd", "tpd"):
@@ -195,6 +220,8 @@ class Pipeline:
                             client=self.http, extra=extra)
             self.lim.sync(model, r.headers)
             self.lim.settle(model, out_est, r.tokens_out)
+            if self.budget is not None:
+                self.budget.record(model, r.tokens_in, r.tokens_out, r.status)
             ctx.tokens_in += r.tokens_in
             ctx.tokens_out += r.tokens_out          # completion_tokens: reasoning is inside it (measured, stage 1)
             mt = ctx.by_model.setdefault(model, [0, 0])
@@ -253,6 +280,8 @@ class Pipeline:
                 self.queued_drafts.add(ctx.rid)
 
             # [1] understand: rewrite query. If it can't run, the raw question still works as a query.
+            # K §29: the RAW-question retrieval pass starts now and overlaps the 20b call (local, no tokens).
+            raw_pass = _Async(lambda: self.ret.search(ctx.question)) if self.p.gate_input == "max" else None
             query, hints = ctx.question, {}
             try:
                 r = self.call_model(ctx, SMALL, understand_messages(ctx.question), "understand")
@@ -264,14 +293,28 @@ class Pipeline:
                 out["degrade_level"] = "raw_query"
             out["query"] = query
 
-            # [2] retrieve (tool)
-            hits, gate, tms = self.ret.search(query)
-            out["gate"] = round(gate, 3)
-            ctx.rerank_ms = round(tms["ce_ms"], 1)
-            ctx.ev("retrieve", **{k: round(v, 1) for k, v in tms.items()}, gate=round(gate, 3),
+            # [2] retrieve (tool). gate_input "max" (K §29): score the raw question and the rewrite; the
+            # higher cross-encoder score is the gate, and the drafter gets THAT query's passages.
+            gate_raw = gate_rw = None
+            if raw_pass is not None and query == ctx.question:          # empty / skipped rewrite: one pass
+                hits, gate, tms = raw_pass.result()
+                gate_raw = gate_rw = gate
+                by = "same"
+            else:
+                hits, gate, tms = self.ret.search(query)
+                gate_rw, by = gate, "rewrite"
+                if raw_pass is not None:
+                    h_raw, gate_raw, _ = raw_pass.result()
+                    if gate_raw > gate:
+                        hits, gate, by = h_raw, gate_raw, "raw"
+            out["gate"], out["gate_by"] = round(gate, 3), by
+            ctx.rerank_ms = round(tms["ce_ms"], 1)      # the pass on the critical path (the raw one overlapped understand)
+            ctx.ev("retrieve", **{k: round(v, 1) for k, v in tms.items()}, gate=round(gate, 3), gate_by=by,
+                   gate_raw=None if gate_raw is None else round(gate_raw, 3),
+                   gate_rewrite=None if gate_rw is None else round(gate_rw, 3),
                    hits=[h.chunk.cite() for h in hits])
 
-            # [3] decide: refuse if the evidence isn't there (cross-encoder on the rewritten query)
+            # [3] decide: refuse if the evidence isn't there (K §29 cutoff on the gate above)
             if gate < self.p.gate_threshold:
                 return self._refuse(ctx, out, hits, "gate")
 
