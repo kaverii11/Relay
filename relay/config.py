@@ -29,7 +29,7 @@ SETTINGS = {
 @dataclass
 class Policy:
     # --- "fast" (DECISIONS §1): PLACEHOLDERS until the end-to-end pipeline is measured
-    system_deadline_ms: float = 10000      # PLACEHOLDER: send the busy reply rather than work past this
+    system_deadline_ms: float = 8000       # K (2026-11-10 §37): 8 s, set after the evening e2e set (first token p95 5.7 s)
     # --- refusal gate (DECISIONS §29, K 2026-11-10): K's midpoint rule on max(raw, rewrite), tuning questions only
     gate_threshold: float = 0.875          # midpoint of highest refuse 0.354 (Q51) and lowest answerable above it 1.395 (Q42)
     gate_input: str = "max"                # "max": cross-encoder on the raw question AND the rewrite; the higher score is the

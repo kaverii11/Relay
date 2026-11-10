@@ -26,14 +26,17 @@ import httpx
 from relay.config import BIG, PAPER_VERSIONS, SMALL, Policy, RetrievalSetting
 from relay.limiter import Limiter
 from relay.llm import stream_chat
-from relay.prompts import check_messages, draft_messages, understand_messages
+from relay.prompts import claim_quotes, check_messages, draft_messages, understand_messages
 from relay.retrieval import Retriever
 from relay.textnorm import match_key, quote_in
 
 DRAFT_OUT_EST = 350      # tokens; real 120b drafts averaged 258 out (stage 2a), padded for safety
 SHORT_OUT_EST = 120      # understand/check; real 20b understand averaged 98 out
-EXPECTED_WORK_MS = {"draft": 1100, "check": 550}   # unloaded medians, stage 2a (draft total, 20b short total)
-EXPECTED_PRE_DRAFT_MS = 750   # understand (20b total p50 536, stage 2a) + retrieve (~200 ms cross-encoder)
+# K (2026-11-10 §37): arrival check expects 3.2 s of work in all = the evening e2e set's answers-only first-token
+# p50 (3212 ms, n=8, which includes 2 redrafts). Split: pre-draft and check at their measured p50s (understand 614
+# + retrieve ~200; check 605); the draft stage carries the rest, i.e. the redraft allowance (measured draft p50 879).
+EXPECTED_WORK_MS = {"draft": 1800, "check": 600}
+EXPECTED_PRE_DRAFT_MS = 800
 
 
 class Cancelled(Exception):
@@ -461,12 +464,16 @@ class Pipeline:
             cid = str(c.get("chunk", ""))
             if not re.fullmatch(r"C\d+", cid) or not 1 <= int(cid[1:]) <= len(use):
                 return False, f"Cited {cid}, which is not one of the passages."
-            if not quote_in(c.get("quote", ""), use[int(cid[1:]) - 1].chunk.text):
-                return False, f"Quote for {cid} is not word-for-word in that passage."
+            qs = claim_quotes(c)                 # K §37: several quotes per claim, EACH word for word
+            if not qs:
+                return False, f"No quote for {cid}."
+            for q in qs:
+                if not quote_in(q, use[int(cid[1:]) - 1].chunk.text):
+                    return False, f"Quote for {cid} is not word-for-word in that passage: \"{q[:60]}\""
         return True, ""
 
     def _model_check(self, ctx, d, use):
-        r = self.call_model(ctx, SMALL, check_messages(ctx.question, d["answer"], d["claims"]), "check",
+        r = self.call_model(ctx, SMALL, check_messages(ctx.question, d["answer"], d["claims"], use), "check",
                             effort=self.p.check_effort)
         j = parse_json(r.text) or {}
         if j.get("supported") is True:

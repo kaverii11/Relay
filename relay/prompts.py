@@ -24,7 +24,8 @@ def understand_messages(question: str):
 
 DRAFT_SYSTEM = """You answer engineers' questions using ONLY the numbered passages given (from three arXiv papers).
 Rules:
-- Every claim must be backed by a passage: give its id (e.g. "C2") and a short quote copied WORD FOR WORD from that passage.
+- Every claim must be backed by a passage: give its id (e.g. "C2") and one or more short quotes, each copied WORD FOR
+  WORD from that passage. If the evidence is in two sentences, give two quotes; never join sentences with "...".
 - If the passages do not contain the answer, set "not_in_papers": true. Do not guess, and do not use outside knowledge.
 - Watch for numbers that belong to OTHER systems or baselines in a table: only report a number for the system asked about.
 - If the question states a value (a number, setting or name), compare it with the passages. If they disagree, say so
@@ -32,7 +33,7 @@ Rules:
 Return ONLY JSON:
 {"not_in_papers": false,
  "answer": "2-4 sentences, with [C#] after each claim",
- "claims": [{"chunk": "C2", "quote": "exact words from passage C2"}]}"""
+ "claims": [{"chunk": "C2", "quotes": ["exact words from passage C2", "more exact words from C2 if needed"]}]}"""
 
 
 def draft_messages(question: str, hits, feedback: str | None = None):
@@ -43,12 +44,27 @@ def draft_messages(question: str, hits, feedback: str | None = None):
     return [{"role": "system", "content": DRAFT_SYSTEM}, {"role": "user", "content": user}]
 
 
-CHECK_SYSTEM = """You verify a drafted answer against its cited quotes. For each claim, decide whether the
-quote actually supports what the answer says, including whether any number is for the right system,
-setting and table row. Return ONLY JSON: {"supported": true|false, "problems": ["short reason", ...]}"""
+CHECK_SYSTEM = """You verify a drafted answer against the cited passages. The quotes show where in each passage the
+drafter looked; judge each claim against the WHOLE cited passage, not only the quote. A claim is supported when
+the passage states it, including that any number is for the right system, setting and table row. A claim is NOT
+supported if the passage contradicts it or does not contain it (the question's own wording is not evidence).
+Return ONLY JSON: {"supported": true|false, "problems": ["short reason", ...]}"""
 
 
-def check_messages(question: str, answer: str, claims_with_quotes):
-    lines = "\n".join(f"- {c['chunk']}: \"{c['quote']}\"" for c in claims_with_quotes)
+def claim_quotes(c) -> list[str]:
+    """A claim's quotes: "quotes": [...] (current drafter) or the older single "quote"."""
+    qs = c.get("quotes")
+    if qs is None:
+        qs = [c.get("quote", "")]
+    return [q for q in (qs if isinstance(qs, list) else [qs]) if isinstance(q, str) and q.strip()]
+
+
+def check_messages(question: str, answer: str, claims, hits):
+    """K (2026-11-10, §37): the checker sees the whole text of every CITED passage, plus the quotes."""
+    cited = sorted({str(c.get("chunk", "")) for c in claims}, key=lambda s: int(s[1:]) if s[1:].isdigit() else 0)
+    passages = "\n\n".join(f"[{cid}] {hits[int(cid[1:]) - 1].chunk.text}" for cid in cited
+                           if cid[1:].isdigit() and 1 <= int(cid[1:]) <= len(hits))
+    lines = "\n".join(f"- {c.get('chunk')}: " + " | ".join(f"\"{q}\"" for q in claim_quotes(c)) for c in claims)
     return [{"role": "system", "content": CHECK_SYSTEM},
-            {"role": "user", "content": f"Question: {question}\n\nAnswer: {answer}\n\nQuotes:\n{lines}"}]
+            {"role": "user", "content": f"Question: {question}\n\nAnswer: {answer}\n\nCited passages:\n{passages}\n\n"
+                                        f"Quotes:\n{lines}"}]

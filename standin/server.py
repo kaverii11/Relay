@@ -93,6 +93,7 @@ class State:
             "stall_rate": V(CAL["failures"]["midstream_stall_rate"]),
             "stall_ms": V(CAL["failures"]["midstream_stall_ms"]),
             "drop_rate": V(CAL["failures"]["midstream_drop_rate"]),
+            "check_fail_rate": V(CAL["failures"]["check_fail_rate"]),   # K §37: share of checks that say "not supported"
             "limits": {k: V(CAL["limits"][k]) for k in LIMIT_NAMES},
         }
         self._build_buckets()
@@ -100,7 +101,7 @@ class State:
         self.peak_inflight = 0
         self.sem = asyncio.Semaphore(self.cfg["max_conc"])
         self.stats = {"requests": 0, "ok": 0, "429": {}, "5xx": 0, "stall": 0, "drop": 0, "rare": 0,
-                      "rewrite_replayed": 0, "rewrite_raw": 0}
+                      "rewrite_replayed": 0, "rewrite_raw": 0, "check_failed": 0}
         self.rewrites = _load_rewrites()
 
     def _build_buckets(self):
@@ -128,7 +129,10 @@ def make_reply(messages) -> str:
         if hit:
             return hit
         return json.dumps({"papers": [], "search_query": user[:200], "needs_numbers": False, "cross_paper": False})
-    if "verify" in system.lower():           # step 5 check
+    if "verify" in system.lower():           # step 5 check: fails at the replay-measured rate (K §37) -> one redraft
+        if S.rng.random() < S.cfg["check_fail_rate"]:
+            S.stats["check_failed"] += 1
+            return json.dumps({"supported": False, "problems": ["simulated: checker did not confirm support"]})
         return json.dumps({"supported": True, "problems": []})
     m = re.search(r"\[(C\d+)\][^\n]*\n(.+)", user)   # step 4 draft: quote the first passage verbatim
     if m:

@@ -12,3 +12,4 @@ data/
 .DS_Store
 load/mix.json
 eval/rewrites_20b.json
+eval/replay_drafts.json

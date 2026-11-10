@@ -40,9 +40,9 @@ SCENARIOS = {
 
 # Load mix (K, DECISIONS §22). None = not set yet; full runs refuse to start until K sets them.
 MIX = {
-    "unanswerable_share": None,     # X: share of fresh questions the papers can't answer (K)
-    "burst_repeat_share": None,     # Y: share of burst questions that exactly repeat one of the burst's hot set (K)
-    "burst_hot_set": None,          # size of each burst's hot set (K: "2-3 questions per burst")
+    "unanswerable_share": 0.25,     # X: share of fresh questions the papers can't answer (K)
+    "burst_repeat_share": 0.5,     # Y: share of burst questions that exactly repeat one of the burst's hot set (K)
+    "burst_hot_set": 3,          # size of each burst's hot set (K: "2-3 questions per burst")
 }
 
 # PLACEHOLDER (K decides, DECISIONS §1): lognormal patience, median 15 s, sigma 0.5 -> p10 ~8 s, p90 ~28 s
