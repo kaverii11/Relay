@@ -67,7 +67,10 @@ def pcts(vals, ps=(50, 95, 99)):
     out = []
     for p in ps:
         v = pct_linear(a, p)
-        out.append("no token" if np.isinf(v) else f"{v:.0f}")
+        s = "no token" if np.isinf(v) else f"{v:.0f}"
+        if p >= 99 and n < 100:
+            s += "†"                     # K: p99 flagged wherever n < 100 (it is the max or next to it)
+        out.append(s)
     return " / ".join(out) + f" (n={n})"
 
 
@@ -167,6 +170,11 @@ def footnote():
           "https://console.groq.com/docs/model/openai/gpt-oss-20b, read 2026-11-09 (pages show no date). "
           "Older Groq posts list different output prices (K: $0.75 / $0.50); the console pages are used. "
           "Reasoning tokens billed as output. Cached input priced at the full input rate.")
+    print("† p99 with n < 100: the top value or next to it, not a stable estimate (K).")
+    print("Stand-in evening profile: fitted on 20b only (n=20 short calls); its 120b values are n=3 or borrowed "
+          "from the afternoon profile (standin/calibration.json).")
+    print("Arrival check expected work 3.2 s: DERIVED from the evening e2e set's answers-only first-token p50 "
+          "(n=8, incl. 2 redrafts), split pre-draft 0.8 / draft 1.8 / check 0.6 s (DECISIONS §37); not a direct measurement.")
 
 
 if __name__ == "__main__":

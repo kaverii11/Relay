@@ -75,7 +75,7 @@
       }
     },
     "evening": {
-      "label": "stage 2b, 2026-11-09 22:00 IST (n=20 short calls on 20b, n=3 drafts on 120b; thin)",
+      "label": "stage 2b, 2026-11-09 22:00 IST: FITTED ON 20b ONLY (n=20 short calls); 120b n=3 drafts, several 120b values borrowed from the afternoon profile (thin)",
       "models": {
         "openai/gpt-oss-20b": {
           "ttft_base_ms": {

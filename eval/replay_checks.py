@@ -136,11 +136,14 @@ def main():
         print(f"  {e['id']:4s} r{e['round']} {'CORRUPT' if e['corrupt'] else '       '} -> {'PASS' if r['pass'] else 'REJECT'} "
               f"({'code' if not r['code_ok'] else 'model' if not r['model_ok'] else 'ok'}) {(r['code_why'] or r['model_why'])[:80]}"
               f"  tok {r['tokens_in']}+{r['tokens_out']} {r['work_ms']} ms", flush=True)
+    # K §38: check_fail_rate = round-0 failures (code OR model check) over ALL real draft paths, n labelled;
+    # a drafter refusal (not_in_papers) is a draft path with no check failure.
     real_r0 = [r for r in results if not r["corrupt"] and r["round"] == 0]
+    failed = [r for r in real_r0 if not r["pass"] and "not_in_papers" not in (r["code_why"] or "")]
     corrupt = [r for r in results if r["corrupt"]]
-    summ = {"n_drafts": len(results), "real_round0_n": len(real_r0),
-            "real_round0_rejected": sum(not r["pass"] for r in real_r0),
-            "check_fail_rate": round(sum(not r["pass"] for r in real_r0) / len(real_r0), 3) if real_r0 else None,
+    summ = {"n_drafts": len(results), "real_round0_n": len(real_r0), "real_round0_failed": [r["id"] for r in failed],
+            "check_fail_rate": round(len(failed) / len(real_r0), 3) if real_r0 else None,
+            "check_fail_rate_label": f"round-0 check failures (code or model) / real draft paths, n={len(real_r0)}",
             "corrupt_n": len(corrupt), "corrupt_rejected": sum(not r["pass"] for r in corrupt),
             "check_tokens_in": [r["tokens_in"] for r in results if r["tokens_in"]],
             "check_work_ms": [r["work_ms"] for r in results if r["work_ms"]]}
