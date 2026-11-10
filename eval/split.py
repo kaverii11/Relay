@@ -4,12 +4,13 @@ questions are written. Never fill `set` by hand.
   .venv/bin/python eval/split.py --seed SEED             # dry run: prints the split, writes nothing
   .venv/bin/python eval/split.py --seed SEED --write     # writes the `set` column into eval/k_questions.csv
 
-Strata = (paper, type, answerable), as K asked. Each stratum gets
-round(n_eval x stratum size / total) eval questions by the largest-remainder method, so the totals
-come out exactly n_eval. Ties are broken by the seeded RNG, which also picks WHICH questions in a
-stratum go to eval. The same seed on the same file always gives the same split. Strata of size 1
-can only go wholly to one side, so small types are matched as closely as the counts allow;
-the printed table shows how close.
+Proportions of answerable, type and paper are kept by SORTED SYSTEMATIC SAMPLING (implicit
+stratification): questions are sorted by (answerable, type, paper), with ties in a seeded random
+order, and every (N / n_eval)-th question from a seeded random start goes to eval. Each answerable
+group, each type within it, and each paper within a type then gets its share to within one question.
+(The first version took quotas on the joint (paper, type, answerable) strata; with 60 questions most
+strata held 1-3 questions, and the rounding left eval at 25% unanswerable vs 42% in tuning. Replaced
+before any split was written; DECISIONS §27.) The same seed on the same file always gives the same split.
 Refuses to overwrite a `set` column that is already filled (re-splitting after seeing results
 would leak the eval set), unless --force.
 """
@@ -19,7 +20,7 @@ import argparse
 import csv
 import random
 import sys
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -40,23 +41,12 @@ def key(r):
 
 def split(rows, n_eval, seed):
     rng = random.Random(seed)
-    strata = defaultdict(list)
-    for r in rows:
-        strata[key(r)].append(r["id"])
-    N = len(rows)
-    quota, rem = {}, []
-    for k in sorted(strata):
-        exact = n_eval * len(strata[k]) / N
-        quota[k] = int(exact)
-        rem.append((exact - int(exact), rng.random(), k))
-    for _, _, k in sorted(rem, reverse=True)[: n_eval - sum(quota.values())]:
-        quota[k] += 1
-    ev = set()
-    for k in sorted(strata):
-        ids = sorted(strata[k])
-        rng.shuffle(ids)
-        ev |= set(ids[: quota[k]])
-    return ev
+    tie = {r["id"]: rng.random() for r in sorted(rows, key=lambda r: r["id"])}
+    order = sorted(rows, key=lambda r: (r["answerable"].strip().lower(), r["type"].strip(),
+                                        norm_paper(r["paper"]), tie[r["id"]]))
+    step = len(order) / n_eval
+    start = rng.random() * step
+    return {order[int(start + i * step)]["id"] for i in range(n_eval)}
 
 
 def table(rows, ev, field, f):

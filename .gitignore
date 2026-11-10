@@ -10,7 +10,5 @@ probe/raw/
 raw/
 data/
 .DS_Store
-eval/k_questions.csv
 load/mix.json
 eval/rewrites_20b.json
-eval/k_questions_drafts.csv
