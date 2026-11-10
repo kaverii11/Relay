@@ -361,9 +361,13 @@ class Pipeline:
                 if d.get("not_in_papers"):
                     return self._refuse(ctx, out, use, "drafter")
                 ok, why = self._code_check(d, use)
+                code_ok, code_why, model_ok, model_why = ok, why, None, ""
                 if ok and self._needs_model_check(hints):
                     ok, why = self._model_check(ctx, d, use)
-                ctx.ev("check", round=round_, ok=ok, why=why, redraft=round_ == 1)
+                    model_ok, model_why = ok, why
+                # K (2026-11-11, item 4): both verdicts recorded separately, so code-only vs both (§8) comes from one run
+                ctx.ev("check", round=round_, ok=ok, why=why, redraft=round_ == 1,
+                       code_ok=code_ok, code_why=code_why, model_ok=model_ok, model_why=model_why)
                 if ok:
                     out["answer"] = self._render(d["answer"], use)
                     out["citations"] = sorted({use[int(c["chunk"][1:]) - 1].chunk.cite() for c in d["claims"]})
