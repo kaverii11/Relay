@@ -13,6 +13,10 @@ class RetrievalSetting:
     k: int              # pieces sent to the drafting model
     rerank: bool        # cross-encoder re-orders BM25's top-20 (the gate uses the cross-encoder either way)
     candidates: int = 20
+    gate_threshold: float | None = None   # per-setting cutoff (K §41); None = Policy.gate_threshold
+
+    def cutoff(self, policy) -> float:
+        return self.gate_threshold if self.gate_threshold is not None else policy.gate_threshold
 
     @property
     def name(self):

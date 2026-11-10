@@ -335,7 +335,7 @@ class Pipeline:
                 out["passages"] = [{"cite": h.chunk.cite(), "bm25": round(h.bm25, 2), "ce": round(h.ce, 3),
                                     "text": h.chunk.text} for h in hits[:self.setting.k]]
             # [3] decide: refuse if the evidence isn't there (K §29 cutoff on the gate above)
-            if gate < self.p.gate_threshold:
+            if gate < self.setting.cutoff(self.p):           # per-setting cutoff (K §41), else Policy's
                 return self._refuse(ctx, out, hits, "gate")
 
             # [3] decide: pick the ladder rung that fits the limits and the deadline

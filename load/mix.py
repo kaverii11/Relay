@@ -180,7 +180,8 @@ def main():
     ap.add_argument("--y", type=float, default=0.0)
     ap.add_argument("--hot", type=int, default=0)
     a = ap.parse_args()
-    cut = Policy().gate_threshold
+    from relay.config import SETTINGS
+    cut = SETTINGS["medium_rerank"].cutoff(Policy())     # the load scenarios' setting; per-setting cutoff (K §41)
 
     if a.coverage:
         from load.loadgen import schedule

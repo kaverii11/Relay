@@ -168,10 +168,11 @@ def main():
     if a.ids:
         qs = by_ids(pool, a.ids)
     else:
-        qs = add_extra(pick(pool, a.n, a.seed), pool, a.extra, a.seed, ret, rw, pol.gate_threshold)
+        qs = add_extra(pick(pool, a.n, a.seed), pool, a.extra, a.seed, ret, rw, setting.cutoff(pol))
     pred = {p["id"]: predicted_gate(p, ret, rw) for p in qs}
     n = len(qs)
-    n_pass = sum(pred[p["id"]] >= pol.gate_threshold for p in qs)
+    cut = setting.cutoff(pol)
+    n_pass = sum(pred[p["id"]] >= cut for p in qs)
     cap = a.cap or 5 * n
     lim = Limiter([SMALL, BIG])
     budget = Budget(run, cap) if real else None
@@ -186,14 +187,14 @@ def main():
              BIG: {"req": 2 * n_pass, "tok": 2 * exp[BIG]["tok"]}}
 
     print(f"[e2e] run {run}: target {'REAL Groq' if real else a.base_url}; setting {setting.name}; "
-          f"gate {pol.gate_threshold} on {pol.gate_input}; deadline {pol.system_deadline_ms:.0f} ms (Policy); "
+          f"gate {setting.cutoff(pol)} on {pol.gate_input}; deadline {pol.system_deadline_ms:.0f} ms (Policy); "
           f"patience {a.patience:.0f} s; reasoning_effort {pol.reasoning_effort}; check_mode {pol.check_mode}")
     print(f"  questions ({n}, tuning, gate_expected=pass, {'--ids' if a.ids else f'seed {a.seed} + {a.extra} extra'}): "
           f"{sum(p['ans'] for p in qs)} answerable + {sum(not p['ans'] for p in qs)} unanswerable-but-pass; "
           f"predicted at the gate: {n_pass} drafts + {n - n_pass} refusals")
     for p in qs:
         g = pred[p["id"]]
-        print(f"    {p['id']:4s} {'ans' if p['ans'] else 'un '}  gate ~{g:6.2f} {'draft  ' if g >= pol.gate_threshold else 'REFUSE '} {p['q']}")
+        print(f"    {p['id']:4s} {'ans' if p['ans'] else 'un '}  gate ~{g:6.2f} {'draft  ' if g >= cut else 'REFUSE '} {p['q']}")
     print(f"  --ids {','.join(p['id'] for p in qs)}")
     print(f"  per question: understand (20b ~{UNDERSTAND_IN}+{UNDERSTAND_OUT}) -> draft (120b ~{draft_in}+{DRAFT_OUT}) "
           f"-> check (20b ~{check_in}+{CHECK_OUT}); all sizes measured on the evening set; worst case +1 draft +1 check")
@@ -219,7 +220,7 @@ def main():
     events_path = ROOT / f"raw/events_{run}.jsonl"
     svc = Service(pl, workers=1, scenario="e2e", events_path=events_path, variant=a.tag, profile="")
     md = ROOT / f"raw/answers_{run}.md"
-    md.write_text(f"# e2e {run}\n\nsetting {setting.name}; gate {pol.gate_threshold} on {pol.gate_input}; "
+    md.write_text(f"# e2e {run}\n\nsetting {setting.name}; gate {setting.cutoff(pol)} on {pol.gate_input}; "
                   f"questions {','.join(p['id'] for p in qs)}\n\n")
     meta = {"run": run, "tag": a.tag, "source": pl.source, "setting": setting.name, "policy": pol.as_dict(),
             "patience_s": a.patience, "gap_s": a.gap, "cap": cap, "seed": a.seed, "extra": a.extra, "ids": a.ids,

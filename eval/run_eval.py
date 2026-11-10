@@ -169,7 +169,7 @@ def main():
     exp, worst = price(REDRAFT_MEASURED), price(1.0)
     u = usage_24h()
     print(f"[eval] run {run}: target {'REAL Groq' if real else a.base_url}; day {a.day} of 2; settings {names}; "
-          f"gate {pol.gate_threshold} on {pol.gate_input}; deadline {pol.system_deadline_ms:.0f} ms; patience {a.patience:.0f} s; "
+          f"gates {', '.join(f'{nm} {SETTINGS[nm].cutoff(pol)}' for nm in names)} on {pol.gate_input}; deadline {pol.system_deadline_ms:.0f} ms; patience {a.patience:.0f} s; "
           f"check_mode {pol.check_mode}; answer cache OFF")
     print(f"  order (seed {a.seed}, all 20): {','.join(order)}")
     print(f"  today ({len(qs)} questions x {len(names)} settings = {n_runs} pipeline runs), settings rotated per question (seed {a.seed}):")
