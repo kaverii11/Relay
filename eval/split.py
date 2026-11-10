@@ -29,7 +29,9 @@ PATH = ROOT / "eval/k_questions.csv"
 
 
 def norm_paper(s):
-    return s.strip().removesuffix(".pdf").split("v")[0] or "(none)"
+    """'2410.00037v1.pdf' -> '2410.00037'; a cross-paper row '1706.03762v7; 2507.07955v2' -> '1706.03762+2507.07955'."""
+    ids = [x.strip().removesuffix(".pdf").split("v")[0] for x in s.split(";") if x.strip()]
+    return "+".join(sorted(ids)) or "(none)"
 
 
 def key(r):

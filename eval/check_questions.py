@@ -18,6 +18,9 @@ Columns (K, 2026-11-10):
   paper          arXiv id, with or without version or ".pdf" (1706.03762, 1706.03762v7, 2410.00037v1.pdf)
   section        as in the paper, e.g. "3.2.2", "3.2.1 Architecture", "Appendix D" (recommended)
   page           PDF page number, or a range 4-5
+  two papers     (cross-paper questions) separate paper, section and page with ";" in the same order:
+                 paper "2410.00037v1; 2507.07955v2", section "5.1; Appendix F", page "22; 38".
+                 Each must_include fact must appear on at least one of the cited pages.
   searched_terms required when answerable = no (may be filled for any row); separate terms with ";"
 Use a spreadsheet or quote fields that contain commas.
 
@@ -83,8 +86,9 @@ def parse_pages(s):
     return list(range(a, b + 1)) if b >= a else None
 
 
-def check_facts(r, v, pg, txt, W):
-    """must_include may hold several facts separated by ';'. Each is looked for on the cited page(s)."""
+def check_facts(r, cites, txt, W):
+    """must_include may hold several facts separated by ';'. Each is looked for on the cited page(s).
+    cites = [(paper_version, [pages]), ...]: one entry, or one per paper for a cross-paper question."""
     facts = [x.strip() for x in r["must_include"].split(";") if x.strip()]
     # "not reported", "no wall-clock comparison": grading notes about what's MISSING, not page facts
     facts = [x for x in facts if not re.match(r"(?i)(not|no)\b", x)]
@@ -92,14 +96,49 @@ def check_facts(r, v, pg, txt, W):
         k = match_key(mi)
         if len(k) < MIN_KEY:
             W(f"must_include {mi!r} is too short to check against the page; check by hand")
-        elif not any(k in txt[v][p - 1] for p in pg):
-            found = [i + 1 for i, t_ in enumerate(txt[v]) if k in t_]
-            W(f"must_include {mi!r} not found verbatim on p.{r['page']} of {v}"
-              + (f"; it appears on p.{', p.'.join(map(str, found))}" if found
-                 else "; not anywhere in that paper (paraphrase, derived number, or a format like 1e-4 vs 10^-4?)"))
+        elif not any(k in txt[v][p - 1] for v, pg in cites for p in pg):
+            found = [f"{v} p.{i + 1}" for v, _ in cites for i, t_ in enumerate(txt[v]) if k in t_]
+            W(f"must_include {mi!r} not found verbatim on p.{r['page']} of {'/'.join(v for v, _ in cites)}"
+              + (f"; it appears on {', '.join(found)}" if found
+                 else "; not anywhere in the cited paper(s) (paraphrase, derived number, or a format like 1e-4 vs 10^-4?)"))
     ea = match_key(r["expected_answer"])
     if facts and ea and any(match_key(f) not in ea for f in facts):
         W("not every must_include fact is in expected_answer")
+
+
+def citations(r, txt, sections, E, W):
+    """paper/section/page -> [(version, [pages])]. Several papers: ';'-separated, same order in all three.
+    Returns None on a paper error (skip the row), [] if pages are missing or bad."""
+    papers = [x.strip() for x in r["paper"].split(";")] if r["paper"].strip() else []
+    pages = [x.strip() for x in r["page"].split(";")] if r["page"].strip() else []
+    secs = [x.strip() for x in r["section"].split(";")] if r["section"].strip() else []
+    if len(papers) > 1 and (len(pages) != len(papers) or (secs and len(secs) != len(papers))):
+        E(f"{len(papers)} papers but {len(pages)} page entries and {len(secs)} section entries: "
+          "give one of each per paper, ';'-separated, in the same order")
+        return []
+    out = []
+    for i, ps in enumerate(papers):
+        v = resolve_paper(ps)
+        if not v:
+            E(f"paper {ps!r} is not one of {PAPER_VERSIONS}")
+            return None
+        if i < len(secs) and secs[i]:
+            sec = section_number(secs[i])
+            if sec not in sections.get(v, set()):
+                W(f"section {sec} not found in {v}'s table of contents "
+                  f"(has e.g. {sorted(sections.get(v, set()))[:8]}...)")
+        else:
+            W(f"section is empty for {v} (recommended)")
+        if i >= len(pages):
+            continue
+        pg = parse_pages(pages[i])
+        if not pg:
+            E(f"page {pages[i]!r} is not a number or a range like 4-5")
+        elif max(pg) > len(txt[v]):
+            E(f"page {pages[i]} is past the end of {v} ({len(txt[v])} pages)")
+        else:
+            out.append((v, pg))
+    return out
 
 
 def main(path: Path):
@@ -152,25 +191,11 @@ def main(path: Path):
             for c in ("expected_answer", "must_include", "paper", "page"):
                 if not r[c].strip():
                     E(f"answerable=yes needs {c}")
-            v = resolve_paper(r["paper"]) if r["paper"].strip() else None
-            if r["paper"].strip() and not v:
-                E(f"paper {r['paper']!r} is not one of {PAPER_VERSIONS}")
+            cites = citations(r, txt, sections, E, W)
+            if cites is None:
                 continue
-            pg = parse_pages(r["page"]) if r["page"].strip() else None
-            if r["page"].strip() and not pg:
-                E(f"page {r['page']!r} is not a number or a range like 4-5")
-            if v and pg and max(pg) > len(txt[v]):
-                E(f"page {r['page']} is past the end of {v} ({len(txt[v])} pages)")
-                pg = None
-            if v and r["section"].strip():
-                sec = section_number(r["section"])
-                if sec not in sections.get(v, set()):
-                    W(f"section {sec} not found in {v}'s table of contents "
-                      f"(has e.g. {sorted(sections.get(v, set()))[:8]}...)")
-            elif v:
-                W("section is empty (recommended)")
-            if v and pg:
-                check_facts(r, v, pg, txt, W)
+            if cites:
+                check_facts(r, cites, txt, W)
         else:
             terms = [x.strip() for x in r["searched_terms"].split(";") if x.strip()]
             if not terms:
@@ -185,10 +210,9 @@ def main(path: Path):
                     W(f"searched term {term!r} DOES appear: {', '.join(where[:8])}"
                       + (f" (+{len(where) - 8} more)" if len(where) > 8 else "") + ". Re-read those pages.")
             if r["paper"].strip() and r["page"].strip():          # K points to the nearest passage: check it too
-                v = resolve_paper(r["paper"])
-                pg = parse_pages(r["page"])
-                if v and pg and max(pg) <= len(txt[v]):
-                    check_facts(r, v, pg, txt, W)
+                cites = citations(r, txt, sections, E, W)
+                if cites:
+                    check_facts(r, cites, txt, W)
 
     print(f"{path}: {len(rows)} questions")
     by = Counter((r["set"].strip() or "(blank)", r["answerable"].strip().lower(), r["gate_expected"].strip().lower())
