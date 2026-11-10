@@ -53,7 +53,7 @@ GROQ = "https://api.groq.com/openai/v1"
 # Rounded up a little so the plan stays conservative.
 UNDERSTAND_IN, UNDERSTAND_OUT = 340, 110
 DRAFT_OUT = 250
-CHECK_IN, CHECK_OUT = 280, 100
+CHECK_IN, CHECK_OUT = 700, 120   # new checker (whole passage, K §37): replay in p50 631 / max 1128, out p50 84 / max 187
 
 
 def _pass_cands(pool):

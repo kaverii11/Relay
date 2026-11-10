@@ -218,8 +218,8 @@
       "source": "assumed: never observed"
     },
     "check_fail_rate": {
-      "value": 0.0,
-      "source": "TO SET from the check replay (K 2026-11-10 \u00a737): share of round-0 real drafts the new checker rejects; n labelled"
+      "value": 0.3,
+      "source": "measured: check replay 2026-11-10 23:28 (raw/replay_checks_20261110_232842.json): round-0 check failures (code or model) / real draft paths of the evening e2e set = 3/10 (Q5, Q41 code; Q28 model), n=10 (K \u00a738 rule)"
     }
   },
   "prompt_cache": {
