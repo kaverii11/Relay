@@ -486,9 +486,14 @@ class Pipeline:
     def _pieces(self, hits, bm_top, k, level):
         """Pieces for a rung: the setting's own order for the full rung; for the degraded rungs, BM25 order
         when the setting's fewer-chunks rung is no-re-rank (K §44), else the setting's order."""
+        # v3 append mode (K 2026-11-12): the paper-hint pieces sit after the k BM25 pieces and are sent on every rung
+        # (the first live run cut them off with [:k], so the drafter never saw them)
+        extra = (hits[self.setting.k:] if getattr(self.setting, "paper_hint", False)
+                 and self.setting.paper_hint_mode == "append" else [])
         if level == "full" or self.setting.fewer[1] == self.setting.rerank:
-            return hits[:k]
-        return (bm_top or hits)[:k]
+            return hits[:k] + extra
+        base = (bm_top or hits)[:k]
+        return base + [h for h in extra if h not in base]
 
     def _plan_draft(self, ctx, query, hits):
         for model, k, level in self._rungs():
