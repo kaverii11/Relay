@@ -507,7 +507,8 @@ class Pipeline:
             if not qs:
                 return False, f"No quote for {cid}."
             for q in qs:
-                if not quote_in(q, use[int(cid[1:]) - 1].chunk.body):   # K §53: never the v2 repeated prefix
+                ch = use[int(cid[1:]) - 1].chunk
+                if not quote_in(q, getattr(ch, "body", ch.text)):   # K §53: never the v2 repeated prefix
                     # K §48: name the real reason. Same verdict either way (quote_in unchanged).
                     if len(match_key(q)) < MIN_QUOTE_KEY:
                         return False, (f"Quote for {cid} is too short (under {MIN_QUOTE_KEY} letters/digits): "
