@@ -16,7 +16,9 @@ rsync -a --exclude='.env' --exclude='.env.*' --exclude='.venv/' --exclude='.git/
       --exclude='raw/_verify_*' \
       relay standin load eval analysis probe scripts library writeup raw requirements.txt README.md DECISIONS.md \
       results.csv "$OUT/"
-cat > "$OUT/conversations/README.md" <<'EOF'
+# the exports live in ~/Relay/conversations/ (gitignored, never pushed) and are copied in on every build
+if [ -d conversations ]; then rsync -a --exclude='.DS_Store' conversations/ "$OUT/conversations/"; fi
+[ -f "$OUT/conversations/README.md" ] || cat > "$OUT/conversations/README.md" <<'EOF'
 # Conversation history (the brief: "your real conversation history with it, not a cleaned-up one")
 
 Put the two exports here, unedited:
