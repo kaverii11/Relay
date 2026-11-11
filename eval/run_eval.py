@@ -1,11 +1,15 @@
 """The eval on REAL Groq (K, 2026-11-11, §40–41): the 20 eval questions through the production pipeline on
-three retrieval settings, split BY QUESTION over two mornings so every setting sees the same days and times.
+three retrieval settings (K §44: medium_rerank 0.875, medium_norerank 0.713, medium_k3_norerank 0.713), split BY
+QUESTION over two days so every setting sees the same days and times.
 
-  .venv/bin/python eval/run_eval.py --plan --day 1 --settings small_pieces,medium_rerank,large_rerank
-  .venv/bin/python eval/run_eval.py --go   --day 1 --settings ...      # K approves the --plan first
-  .venv/bin/python eval/run_eval.py --plan --day 2 ...                  # Thursday, not before Wednesday's start time
+  .venv/bin/python eval/run_eval.py --plan --day 1          # all 20 in the seeded order until the 170k ceiling
+  .venv/bin/python eval/run_eval.py --go   --day 1          # K approves the --plan first
+  .venv/bin/python eval/run_eval.py --plan --day 2          # Thursday: the questions day 1 did not reach,
+                                                            # not before Wednesday's start time (same time of day)
 
-Order: the 20 eval ids shuffled once with --seed (default 42; logged). Day 1 = positions 1-10, day 2 = 11-20.
+Order: the 20 eval ids shuffled once with --seed (default 42; logged). Day 1 (K, 2026-11-11): run in that order until
+the per-model 24 h ceiling would not fit the next question's worst case, stopping at a question boundary; day 2 = the
+rest (read from day 1's meta file, `completed`).
 K §41: - the order of the settings is ROTATED per question (seeded, logged in the meta file);
        - spacing after a run = that setting's estimated draft prompt x 2 (room for a redraft) against the
          7000 input-tokens-per-minute limit of 120b (and the same for 20b's understand + check), never below
@@ -121,9 +125,9 @@ def main():
     ap.add_argument("--plan", action="store_true")
     ap.add_argument("--go", action="store_true")
     ap.add_argument("--day", type=int, required=True, choices=(1, 2))
-    ap.add_argument("--settings", default="small_pieces,medium_rerank,large_rerank")
+    ap.add_argument("--settings", default="medium_rerank,medium_norerank,medium_k3_norerank")
     ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--per-day", type=int, default=10)
+    ap.add_argument("--force", action="store_true", help="day 2 earlier in the day than day 1 started (K: not allowed)")
     ap.add_argument("--cap", type=int, default=None)
     ap.add_argument("--patience", type=float, default=60.0)
     ap.add_argument("--min-gap", type=float, default=10.0)
@@ -137,13 +141,29 @@ def main():
     pol = Policy()
     pool = {p["id"]: p for p in load_pool()}
     order = order_ids(pool.values(), a.seed)
-    ids = order[(a.day - 1) * a.per_day: a.day * a.per_day]
+    rotation = setting_rotation(names, order, a.seed)       # by position in the full order: day 2 keeps day 1's rotation
+    prefix = "eval" if real else "evalsmoke"
+    done_before = []
+    if a.day == 1:
+        ids = list(order)
+    else:
+        metas = sorted((ROOT / "raw").glob(f"meta_{prefix}_day1_*.json"))
+        if not metas:
+            raise SystemExit("day 2 needs day 1's meta file (raw/meta_eval_day1_*.json)")
+        m1 = json.loads(metas[-1].read_text())
+        done_before = m1.get("completed", [])
+        ids = [i for i in order if i not in done_before]
+        t1 = dt.datetime.fromisoformat(m1["started"]).astimezone()
+        now = dt.datetime.now().astimezone()
+        if now.time() < t1.time() and not a.force:
+            raise SystemExit(f"K: Thursday's half starts no earlier than Wednesday's start time ({t1.strftime('%H:%M')} local); "
+                             f"now {now.strftime('%H:%M')}. --force to override (log it).")
+        print(f"  day 1 ({metas[-1].name}) completed {len(done_before)}: {','.join(done_before)}; left {len(ids)}")
     qs = [pool[i] for i in ids]
-    rotation = setting_rotation(names, ids, a.seed)
     n_runs = len(qs) * len(names)
     cap = a.cap or 5 * n_runs
     stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-    run = f"eval_day{a.day}_{stamp}"
+    run = f"{prefix}_day{a.day}_{stamp}"
 
     cross_encoder()
     lim = Limiter([SMALL, BIG])
@@ -186,8 +206,23 @@ def main():
               f"~{worst[m]['tok']:6.0f}; last 24 h {u[m]['tokens']:6d} -> after worst ~{u[m]['tokens'] + worst[m]['tok']:6.0f} "
               f"of ceiling {CEILING} ({'OK' if u[m]['tokens'] + worst[m]['tok'] <= CEILING else 'OVER: the run would stop at a question boundary'})")
     print(f"  per-question ceiling check (worst case, all settings): 20b ~{wq[SMALL]:.0f}, 120b ~{wq[BIG]:.0f} tokens")
+    # forecast of the question boundary where the run stops (K: run until the ceiling, stop at a boundary)
+    eq = {m: exp[m]["tok"] / max(1, len(qs)) for m in (SMALL, BIG)}      # expected tokens per question at 30%
+    def stops_after(per_q_spend):
+        used = {m: u[m]["tokens"] for m in (SMALL, BIG)}
+        for i, p in enumerate(qs):
+            if any(used[m] + wq[m] > CEILING for m in (SMALL, BIG)):      # the check is always worst-case
+                return i, used
+            for m in (SMALL, BIG):
+                used[m] += per_q_spend[m]
+        return len(qs), used
+    n_w, used_w = stops_after(wq)
+    n_e, used_e = stops_after(eq)
+    print(f"  forecast: if every draft is redrafted, the ceiling check stops the run after {n_w} of {len(qs)} questions "
+          f"(20b ~{used_w[SMALL]:.0f}, 120b ~{used_w[BIG]:.0f}); at the measured 30% redraft rate after {n_e} "
+          f"(20b ~{used_e[SMALL]:.0f}, 120b ~{used_e[BIG]:.0f}). The rest go on day 2.")
     tot_gap = sum(gaps[nm] for nm in names) * len(qs)
-    print(f"  pacing: ~{(tot_gap + 5 * n_runs) / 60:.0f} min")
+    print(f"  pacing: ~{(tot_gap + 5 * n_runs) / 60:.0f} min for all {len(qs)} (~{(tot_gap + 5 * n_runs) / 60 * n_e / max(1, len(qs)):.0f} min to the 30% stop)")
     if not a.go:
         print("  (plan only; nothing sent. Re-run with --go once approved.)")
         return
@@ -200,9 +235,11 @@ def main():
     svcs = {nm: Service(pls[nm], workers=1, scenario="eval", events_path=ROOT / f"raw/events_{run}_{nm}.jsonl",
                         variant=f"day{a.day}", profile="") for nm in names}
     md = ROOT / f"raw/reading_{run}.md"
-    md.write_text(f"# eval reading file, {run}\n\nsettings {names}; gate {pol.gate_threshold} on {pol.gate_input}; "
+    md.write_text(f"# eval reading file, {run}\n\nsettings {names}; gates "
+                  f"{', '.join(f'{nm} {SETTINGS[nm].cutoff(pol)}' for nm in names)} on {pol.gate_input}; "
                   f"questions {','.join(ids)}\n\n")
     meta = {"run": run, "day": a.day, "seed": a.seed, "order": order, "questions": ids, "settings": names,
+            "completed": [], "completed_before": done_before,
             "setting_order_per_question": rotation, "gaps_s": gaps, "policy": pol.as_dict(), "patience_s": a.patience,
             "cap": cap, "draft_in_est": draft_in, "worst_per_question": wq,
             "started": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"), "ledger_before": u}
@@ -239,13 +276,17 @@ def main():
                 stopped = budget.stopped
                 print(f"  STOP: {stopped}")
                 break
-            if i < n_runs:
+            if i < n_runs and real:          # the stand-in smoke run does not need ITPM spacing
                 time.sleep(gaps[nm])
         if stopped:
             break
+        meta["completed"].append(p["id"])
+        (ROOT / f"raw/meta_{run}.json").write_text(json.dumps(meta, indent=2))
+        write_csv(rows, ROOT / f"raw/results_{run}.csv")          # rewritten after every question: nothing lost on a kill
     write_csv(rows, ROOT / f"raw/results_{run}.csv")
     summ = {"n": len(rows), "answers": sum(r["reply_kind"] == "answer" for r in rows),
             "refusals": sum(r["reply_kind"] == "refusal" for r in rows), "busy": sum(r["reply_kind"] == "busy" for r in rows),
+            "unverified": sum(r["reply_kind"] == "unverified" for r in rows), "completed": meta["completed"],
             "by_setting": {nm: sum(r["retrieval_setting"] == SETTINGS[nm].name for r in rows) for nm in names},
             "limiter_wait_ms_total": round(sum(r.get("limiter_wait_ms") or 0 for r in rows), 1),
             "tokens_cached_total": sum(r.get("tokens_cached") or 0 for r in rows),

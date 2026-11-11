@@ -22,8 +22,9 @@ COLUMNS = ["request_id", "scenario", "source", "start_time", "first_token_ms", "
            "service_start_ms", "gave_up", "degrade_level", "model", "calls",
            "tokens_in_120b", "tokens_out_120b", "tokens_in_20b", "tokens_out_20b", "rerank_ms",
            "limiter_wait_ms", "tokens_cached",   # K §41: our limiter's waits (Table 3 excludes them); Groq cached prompt tokens
-           "reply_kind",   # answer | refusal | busy | none (gave up / error); cache hits keep their kind
+           "reply_kind",   # answer | refusal | unverified (K §44: check failed twice) | busy | none (gave up / error)
            "draft_ready_ms", "draft_sent_ms", "arrival_pred_draft_sent_ms", "arrival_busy_pred", "busy_path",
+           "daily_phase",       # K §44: before | after the 120b day budget stopped serving drafts (reserve reached / per-day 429)
            "run_variant",       # "" = main run; else e.g. shadow / nolearn / evening (tables group by it)
            "standin_profile"]   # stand-in latency profile, with its n; "" for real Groq
 
@@ -87,7 +88,7 @@ class Service:
                "limiter_wait_ms": res.get("limiter_wait_ms"), "tokens_cached": res.get("tokens_cached"),
                "reply_kind": res.get("kind") or "none",
                **{k: res.get(k) for k in ("draft_ready_ms", "draft_sent_ms", "arrival_pred_draft_sent_ms",
-                                          "arrival_busy_pred", "busy_path")},
+                                          "arrival_busy_pred", "busy_path", "daily_phase")},
                "run_variant": self.variant, "standin_profile": self.profile}
         detail = {k: v for k, v in res.items() if k != "events"}
         with self.lock:

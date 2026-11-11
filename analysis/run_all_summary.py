@@ -60,7 +60,7 @@ def main(path):
         gave = sum(r["gave_up"] in ("1", "True") for r in rows)
         if gave:
             flags.append(f"{gave} gave up")
-        ft = [f(r["first_token_ms"]) for r in rows if r["reply_kind"] in ("answer", "refusal")]
+        ft = [f(r["first_token_ms"]) for r in rows if r["reply_kind"] in ("answer", "refusal", "unverified")]
         p = pcts(ft, ps=(50, 95)) if ft else "n=0"
         if ft:
             s = sorted(x for x in ft if x is not None)

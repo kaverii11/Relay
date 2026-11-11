@@ -14,18 +14,33 @@ class RetrievalSetting:
     rerank: bool        # cross-encoder re-orders BM25's top-20 (the gate uses the cross-encoder either way)
     candidates: int = 20
     gate_threshold: float | None = None   # per-setting cutoff (K §41); None = Policy.gate_threshold
+    # the ladder's fewer-chunks rung (DECISIONS §2): pieces sent when the full rung would miss the deadline.
+    # None = half the pieces (min 2) in this setting's own order. K (2026-11-11 §44): 250/3 in BM25 order.
+    fewer_k: int | None = None
+    fewer_rerank: bool | None = None
 
     def cutoff(self, policy) -> float:
         return self.gate_threshold if self.gate_threshold is not None else policy.gate_threshold
+
+    @property
+    def fewer(self) -> tuple[int, bool]:
+        k = self.fewer_k if self.fewer_k is not None else max(2, self.k // 2)
+        rr = self.fewer_rerank if self.fewer_rerank is not None else self.rerank
+        return k, rr
 
     @property
     def name(self):
         return f"w{self.words}_k{self.k}_rr{int(self.rerank)}"
 
 
+# K (2026-11-11 §44), from the offline recall table and her midpoint rule (raw/settings_table_*, raw/cutoffs_by_size_*):
+# three 250-word settings, each with its own cutoff; the fewer-chunks rung is 250/3 in BM25 order for all three.
 SETTINGS = {
+    "medium_rerank": RetrievalSetting(250, 6, True, gate_threshold=0.875, fewer_k=3, fewer_rerank=False),      # baseline
+    "medium_norerank": RetrievalSetting(250, 6, False, gate_threshold=0.713, fewer_k=3, fewer_rerank=False),
+    "medium_k3_norerank": RetrievalSetting(250, 3, False, gate_threshold=0.713, fewer_k=3, fewer_rerank=False),
+    # earlier candidates, kept for the offline tables only (not run on Groq)
     "small_pieces": RetrievalSetting(120, 8, False),
-    "medium_rerank": RetrievalSetting(250, 6, True),
     "large_rerank": RetrievalSetting(500, 3, True),
 }
 

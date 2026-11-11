@@ -81,10 +81,13 @@ class Retriever:
             ce = self._ce_scores(query, cand)
             order = sorted(range(len(cand)), key=lambda j: -ce[j])[:k]
             hits = [Hit(cand[j], float(scores[top[j]]), ce[j]) for j in order]
+            # BM25's own top-k with the scores already computed: the fewer-chunks rung (K §44) sends these
+            bm_top = [Hit(cand[j], float(scores[top[j]]), ce[j]) for j in range(min(k, len(cand)))]
         else:
             cand = [self.chunks[i] for i in top[:k]]
             ce = self._ce_scores(query, cand)
             hits = [Hit(c, float(scores[i]), s) for c, i, s in zip(cand, top[:k], ce)]
+            bm_top = hits
         t2 = time.perf_counter()
         gate = max(h.ce for h in hits) if hits else -1e9
-        return hits, gate, {"bm25_ms": (t1 - t0) * 1000, "ce_ms": (t2 - t1) * 1000}
+        return hits, gate, {"bm25_ms": (t1 - t0) * 1000, "ce_ms": (t2 - t1) * 1000, "bm25_top": bm_top}

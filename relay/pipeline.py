@@ -124,6 +124,7 @@ class Ctx:
     arrival_pred_draft_sent_ms: float | None = None
     arrival_busy_pred: int | None = None     # 1 = the arrival check said busy (acted on, or shadow only)
     busy_path: str = ""                      # arrival | mid | queue
+    daily_phase: str = ""                    # K §44: "before" | "after" the 120b day budget stopped serving drafts (reserve reached or 429)
     tokens_cached: int = 0                   # prompt tokens Groq served from its cache (K, eval: logged per call)
     limiter_wait_ms: float = 0.0             # our own limiter's planned waits, summed (Table 3 excludes it, K)
     tokens_in: int = 0
@@ -279,6 +280,9 @@ class Pipeline:
     def run(self, ctx: Ctx) -> dict:
         out = {"degrade_level": "full", "model": "", "answer": "", "kind": "", "gate": None,
                "citations": [], "query": None}
+        # K §44 (Table 2a/2b column): at arrival, is the 120b day budget still serving drafts?
+        ctx.daily_phase = ("after" if self.daily_hit is not None
+                           or self.lim.daily_fraction_left(BIG) < self.p.daily_reserve_fraction else "before")
         try:
             # cache (rung 0)
             if self.p.cache and self.cache:
@@ -317,13 +321,15 @@ class Pipeline:
                 hits, gate, tms = raw_pass.result()
                 gate_raw = gate_rw = gate
                 by = "same"
+                bm_top = tms.pop("bm25_top", hits)
             else:
                 hits, gate, tms = self.ret.search(query)
                 gate_rw, by = gate, "rewrite"
+                bm_top = tms.pop("bm25_top", hits)
                 if raw_pass is not None:
-                    h_raw, gate_raw, _ = raw_pass.result()
+                    h_raw, gate_raw, t_raw = raw_pass.result()
                     if gate_raw > gate:
-                        hits, gate, by = h_raw, gate_raw, "raw"
+                        hits, gate, by, bm_top = h_raw, gate_raw, "raw", t_raw.get("bm25_top", h_raw)
             out["gate"], out["gate_by"] = round(gate, 3), by
             ctx.rerank_ms = round(tms["ce_ms"], 1)      # the pass on the critical path (the raw one overlapped understand)
             ctx.ev("retrieve", **{k: round(v, 1) for k, v in tms.items()}, gate=round(gate, 3), gate_by=by,
@@ -345,9 +351,11 @@ class Pipeline:
             model, k, level = plan
             if level != "full":
                 out["degrade_level"] = level
-            use = hits[:k]
+            # K §44: the fewer-chunks rung sends BM25's top pieces (no re-rank) when the setting says so
+            use = self._pieces(hits, bm_top, k, level)
             if self.keep_passages:
-                out["passages"] = out["passages"][:k]
+                out["passages"] = [{"cite": h.chunk.cite(), "bm25": round(h.bm25, 2), "ce": round(h.ce, 3),
+                                    "text": h.chunk.text} for h in use]
 
             # [4] draft  -> [5] check, with ONE redraft loop
             feedback = None
@@ -389,7 +397,7 @@ class Pipeline:
                                        {k: out[k] for k in ("answer", "citations", "kind", "model", "query", "gate")})
                     return self._deliver(ctx, out, "ok")
                 feedback = why
-            return self._refuse(ctx, out, use, "unverified")
+            return self._unverified(ctx, out, use)
         except Cancelled:
             ctx.ev("gave_up")
             return self._finish(ctx, out, "timeout", gave_up=True)
@@ -412,9 +420,9 @@ class Pipeline:
         cheapest rung misses the deadline (K). Logged in both 'on' and 'shadow' modes."""
         with self.qlock:
             ahead = len(self.queued_drafts - {ctx.rid})
-        k_full, k_less = self.setting.k, max(2, self.setting.k // 2)
+        k_full = self.setting.k
         best = None
-        for model, k, level in [(BIG, k_full, "full"), (BIG, k_less, "fewer_chunks"), (SMALL, k_less, "small_model")]:
+        for model, k, level in self._rungs():
             if model == BIG and self.lim.daily_fraction_left(BIG) < self.p.daily_reserve_fraction:
                 continue
             ahead_tok = ahead * self.draft_est(k_full) if model == BIG else 0.0
@@ -435,10 +443,25 @@ class Pipeline:
                binding=binding, mode=self.p.arrival_check)
         return busy, wait, binding
 
+    def _rungs(self):
+        """The ladder (DECISIONS §2): full -> fewer chunks (K §44: the setting's `fewer`, 250/3 BM25 order) ->
+        20b draft. The fewer-chunks rung is skipped when it would send the same pieces as the full rung."""
+        k_full, (k_less, rr_less) = self.setting.k, self.setting.fewer
+        rungs = [(BIG, k_full, "full")]
+        if (k_less, rr_less) != (k_full, self.setting.rerank):
+            rungs.append((BIG, k_less, "fewer_chunks"))
+        rungs.append((SMALL, k_less, "small_model"))
+        return rungs
+
+    def _pieces(self, hits, bm_top, k, level):
+        """Pieces for a rung: the setting's own order for the full rung; for the degraded rungs, BM25 order
+        when the setting's fewer-chunks rung is no-re-rank (K §44), else the setting's order."""
+        if level == "full" or self.setting.fewer[1] == self.setting.rerank:
+            return hits[:k]
+        return (bm_top or hits)[:k]
+
     def _plan_draft(self, ctx, query, hits):
-        k_full, k_less = self.setting.k, max(2, self.setting.k // 2)
-        rungs = [(BIG, k_full, "full"), (BIG, k_less, "fewer_chunks"), (SMALL, k_less, "small_model")]
-        for model, k, level in rungs:
+        for model, k, level in self._rungs():
             if model == BIG and self.lim.daily_fraction_left(BIG) < self.p.daily_reserve_fraction:
                 ctx.ev("ladder_skip", rung=level, why="daily_reserve")
                 continue
@@ -455,7 +478,7 @@ class Pipeline:
     def _busy_eta(self, ctx, query, hits):
         best = (None, math.inf)
         for model in (BIG, SMALL):
-            n_in = est_tokens(draft_messages(ctx.question, hits[:max(2, self.setting.k // 2)]))
+            n_in = est_tokens(draft_messages(ctx.question, hits[:self.setting.fewer[0]]))
             w, kind = self.lim.predict_wait_s(model, n_in, DRAFT_OUT_EST)
             if w < best[1]:
                 best = (kind, w)
@@ -512,6 +535,17 @@ class Pipeline:
                            {k: out[k] for k in ("answer", "citations", "kind", "query", "gate")})
         return self._deliver(ctx, out, "ok")
 
+    def _unverified(self, ctx, out, use):
+        """K (2026-11-11 §44): the check failed again after the one redraft. A third fixed reply, no model call,
+        its own reply kind ("unverified"), not "busy" and not "the papers don't say". Not cached."""
+        cites = ", ".join(h.chunk.cite() for h in use)
+        out.update(kind="unverified", answer=(
+            "I found relevant passages but couldn't verify an answer: my draft's claims did not check out "
+            "against the papers' text, twice, so I'm not sending it. The passages I would have drawn on: "
+            f"{cites}."), citations=[h.chunk.cite() for h in use])
+        ctx.ev("unverified", cites=len(use))
+        return self._deliver(ctx, out, "ok")
+
     def _busy(self, ctx, out, limit_kind, eta_s, path="mid"):
         ctx.busy_path = path
         eta = "under a minute" if eta_s < 60 else (f"about {math.ceil(eta_s / 60)} min" if eta_s < 3600
@@ -540,4 +574,4 @@ class Pipeline:
                 "tokens_cached": ctx.tokens_cached, "limiter_wait_ms": round(ctx.limiter_wait_ms, 1),
                 **{k: (None if getattr(ctx, k) is None else (round(getattr(ctx, k), 1) if isinstance(getattr(ctx, k), float) else getattr(ctx, k)))
                    for k in ("draft_ready_ms", "draft_sent_ms", "arrival_pred_draft_sent_ms", "arrival_busy_pred")},
-                "busy_path": ctx.busy_path}
+                "busy_path": ctx.busy_path, "daily_phase": ctx.daily_phase}

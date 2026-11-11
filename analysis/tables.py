@@ -3,10 +3,13 @@
   .venv/bin/python analysis/tables.py results.csv
 
 Definitions (DECISIONS §5, §7, K's percentile rule):
-- Percentiles: numpy linear interpolation over ALL requests sent in the scenario. A request
-  with no first token (busy reply, gave up, error) counts as +infinity, so once more than 5%
-  get no token, p95 prints "no token (>X%)". n is printed beside every percentile.
-- Total time: time until the person has the complete reply; no answer -> +infinity (same rule).
+- Percentiles (K, 2026-11-11 §44): numpy linear interpolation over the requests that GOT A REPLY
+  (status ok: answer, refusal or unverified), with n and the share of all requests that got no
+  token (busy reply, gave up, error) printed in the same cell. Time to the busy reply (its own
+  column) is total_ms of the busy rows. p99 is flagged † wherever n < 100.
+- Total time: time until the person has the complete reply (same rows).
+- daily_phase (K §44): rows are split into "before" and "after" the 120b day budget stopped serving
+  drafts (reserve reached or per-day 429) when a run has both; steady becomes two rows.
 - Offered rate: requests / (last start_time - first start_time) * 60.
 - Duration: last (start_time + total_ms) - first start_time.
 - Peak queue length (= peak WAITING, K): max overlap of waiting intervals. Each request waits
@@ -93,28 +96,42 @@ def peak_queue(rows):
 def main(path):
     rows = list(csv.DictReader(open(path)))
     by = defaultdict(list)
+    phases = defaultdict(set)
     for r in rows:
         lab = r["scenario"] + (f" [{r['run_variant']}]" if r.get("run_variant") else "")
         src = r["source"] + (f", {r['standin_profile']}" if r.get("standin_profile") else "")
+        phases[(lab, src, r["retrieval_setting"])].add(r.get("daily_phase") or "")
+    for r in rows:
+        lab = r["scenario"] + (f" [{r['run_variant']}]" if r.get("run_variant") else "")
+        src = r["source"] + (f", {r['standin_profile']}" if r.get("standin_profile") else "")
+        key = (lab, src, r["retrieval_setting"])
+        ph = r.get("daily_phase") or ""
+        if len(phases[key]) > 1:            # K §44: split only where the run crossed the 120b day budget
+            lab += f" ({ph} 120b day budget gone)"
         by[(lab, src, r["retrieval_setting"])].append(r)
 
-    print("\nTable 2a: latency (ms). Percentiles over ALL requests; no token = +inf")
+    print("\nTable 2a: latency (ms). Percentiles over requests that got a reply; no-token share of all requests in the cell")
     print("| Scenario | Real or stand-in | Setting | Requests sent | Duration (s) | Offered rate (per min) | "
-          "First token p50 / p95 / p99 (ms) | Total time p50 / p95 / p99 (ms) |")
-    print("|---|---|---|---|---|---|---|---|")
+          "First token p50 / p95 / p99 (ms) | Total time p50 / p95 / p99 (ms) | Time to busy reply p50 / p95 (ms) |")
+    print("|---|---|---|---|---|---|---|---|---|")
     for (sc, src, st), rs in sorted(by.items()):
         starts = sorted(dt.datetime.fromisoformat(r["start_time"]).timestamp() for r in rs)
         ends = [dt.datetime.fromisoformat(r["start_time"]).timestamp() + f(r["total_ms"]) / 1000 for r in rs]
         dur = max(ends) - starts[0]
         rate = len(rs) / (starts[-1] - starts[0]) * 60 if len(rs) > 1 else float("nan")
-        ft = [f(r["first_token_ms"]) for r in rs]
-        tot = [f(r["total_ms"]) if r["status"] == "ok" else None for r in rs]
-        print(f"| {sc} | {src} | {st} | {len(rs)} | {dur:.0f} | {rate:.2f} | {pcts(ft)} | {pcts(tot)} |")
+        got = [r for r in rs if r["status"] == "ok" and f(r["first_token_ms"]) is not None]
+        no_tok = f"; no token {100 * (len(rs) - len(got)) / len(rs):.0f}%"
+        ft = pcts([f(r["first_token_ms"]) for r in got])
+        tot = pcts([f(r["total_ms"]) for r in got])
+        busy = [f(r["total_ms"]) for r in rs if r["reply_kind"] == "busy"]
+        tb = pcts(busy, (50, 95)) if busy else "no busy replies"
+        print(f"| {sc} | {src} | {st} | {len(rs)} | {dur:.0f} | {rate:.2f} | {ft[:-1] + no_tok + ')'} | "
+              f"{tot[:-1] + no_tok + ')'} | {tb} |")
 
     print("\nTable 2b: outcomes")
-    print("| Scenario | Succeeded % | Rate-limited % | Timed out or given up % | (error %) | Retries per request | "
+    print("| Scenario | Succeeded % | (of which unverified %) | Rate-limited % | Timed out or given up % | (error %) | Retries per request | "
           "Peak queue length | Tokens per answer | Cost per 1,000 answers |")
-    print("|---|---|---|---|---|---|---|---|---|")
+    print("|---|---|---|---|---|---|---|---|---|---|")
     for (sc, src, st), rs in sorted(by.items()):
         n = len(rs)
         pc = lambda s: 100 * sum(r["status"] == s for r in rs) / n  # noqa: E731
@@ -124,16 +141,17 @@ def main(path):
         okr = [r for r in rs if r["status"] == "ok"]
         ans = [r for r in okr if r["reply_kind"] == "answer"]
         ref = [r for r in okr if r["reply_kind"] == "refusal"]
+        unv = [r for r in okr if r["reply_kind"] == "unverified"]
         per = lambda xs: f"${paid_cost(xs) / len(xs) * 1000:.3f}" if xs else "n/a"  # noqa: E731
         cost = (f"$0 billed (free tier); paid on-demand: ${paid_cost(rs) / ok * 1000:.3f} all-in "
-                f"[drafted {per(ans)}, refusals {per(ref)}, refusal share {100 * len(ref) / ok:.1f}%]") if ok else "no answers"
-        print(f"| {sc} ({src}) | {pc('ok'):.1f} | {pc('rate_limited'):.1f} | {pc('timeout'):.1f} | {pc('error'):.1f} | "
+                f"[drafted {per(ans)}, refusals {per(ref)}, unverified {per(unv)}; refusal share {100 * len(ref) / ok:.1f}%]") if ok else "no answers"
+        print(f"| {sc} ({src}) | {pc('ok'):.1f} | {100 * len(unv) / n:.1f} | {pc('rate_limited'):.1f} | {pc('timeout'):.1f} | {pc('error'):.1f} | "
               f"{np.mean([int(r['retries']) for r in rs]):.2f} | {peak_queue(rs)} | {tpa} | {cost} |")
 
     print("\nLoad mix (extra, K §22): question rate vs draft demand, from results.csv")
     print("| Scenario | Questions/min | Drafts/min (reached the draft) | Drafts / ceiling (2.5) | "
-          "Refusals % (fresh) | Cache hits % | Busy % |")
-    print("|---|---|---|---|---|---|---|")
+          "Refusals % (fresh) | Unverified % | Cache hits % | Busy % |")
+    print("|---|---|---|---|---|---|---|---|")
     for (sc, src, st), rs in sorted(by.items()):
         starts = sorted(dt.datetime.fromisoformat(r["start_time"]).timestamp() for r in rs)
         span = (starts[-1] - starts[0]) / 60 if len(rs) > 1 else float("nan")
@@ -142,8 +160,9 @@ def main(path):
         cache = sum(r["degrade_level"] == "cache" for r in rs)
         fresh_ref = sum(r["reply_kind"] == "refusal" and r["degrade_level"] != "cache" for r in rs)
         busy = sum(r["reply_kind"] == "busy" for r in rs)
+        unv = sum(r["reply_kind"] == "unverified" for r in rs)
         print(f"| {sc} ({src}) | {n / span:.2f} | {drafts / span:.2f} | {drafts / span / 2.5:.2f}x | "
-              f"{100 * fresh_ref / n:.1f} | {100 * cache / n:.1f} | {100 * busy / n:.1f} |")
+              f"{100 * fresh_ref / n:.1f} | {100 * unv / n:.1f} | {100 * cache / n:.1f} | {100 * busy / n:.1f} |")
 
     graded = [r for r in rows if r["answer_grade"]]
     if graded:
