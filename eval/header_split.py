@@ -23,7 +23,7 @@ sys.path.insert(0, str(ROOT))
 from eval.check_questions import parse_pages, resolve_paper  # noqa: E402
 from eval.cutoffs_by_size import facts_of  # noqa: E402
 from load.mix import load_pool  # noqa: E402
-from relay.ingest import load, table_regions  # noqa: E402
+from relay.ingest import _is_figure_noise, load, table_regions  # noqa: E402
 from relay.textnorm import match_key  # noqa: E402
 
 
@@ -87,7 +87,24 @@ def main():
         f = f[1]
         head = [c for c in pieces if htoks and sum(x in match_key(c.body) for x in htoks) / len(htoks) >= 0.6]
         idn = lambda cs: ", ".join(c.id.split(":")[1] for c in cs) or "-"  # noqa: E731
-        split = "n/a (answer not found in a table piece)" if not ans else ("**yes**" if not set(map(id, ans)) & set(map(id, head)) else "no")
+        # K §61: a header row can also be MISSING from the corpus: ingest's figure-noise filter drops blocks of short
+        # lines (Moshi Table 11's "Bitwidth vs Block size | 256 | 32"). Token matching can't see that when another
+        # table has the same header words (Table 10), so check the blocks themselves.
+        b = t["bbox"]
+        pno_t = next(pn for pn, ts in regs[v].items() if any(x is t for x in ts))
+        inside = [bl for bl in docs[v][pno_t - 1].get_text("blocks")
+                  if bl[0] < b[2] and bl[2] > b[0] and bl[1] < b[3] and bl[3] > b[1]]
+        share = lambda bl: sum(x in match_key(bl[4]) for x in htoks) / len(htoks) if htoks else 0  # noqa: E731
+        # dropped = a noise-filtered block carries the header AND no kept block carries a real part of it
+        # (Moshi Table 8: the detected header also swallowed 3 word-heavy data rows; its kept block "Model | Web Q.
+        # | LlaMA Q. | ..." holds a third of those tokens, so the header is not dropped)
+        hdrop = (any(_is_figure_noise(bl[4]) and share(bl) >= 0.6 for bl in inside)
+                 and not any(not _is_figure_noise(bl[4]) and share(bl) >= 0.3 for bl in inside))
+        if hdrop:
+            head = []
+        split = ("n/a (answer not found in a table piece)" if not ans else
+                 "**yes: header row dropped by ingest, in no piece**" if hdrop else
+                 ("**yes**" if not set(map(id, ans)) & set(map(id, head)) else "no"))
         print(f"| {p['id']} | {v} Table {t['n']} | {f} | {idn(pieces)} | {idn(ans)} | {idn(head)} | {split} |")
 
 

@@ -36,12 +36,20 @@ Return ONLY JSON:
  "claims": [{"chunk": "C2", "quotes": ["exact words from passage C2", "more exact words from C2 if needed"]}]}"""
 
 
-def draft_messages(question: str, hits, feedback: str | None = None):
+# v2 (K §61, option (i) for the table prefix, part of change a): K's sentence, added to the v1 rules verbatim.
+DRAFT_SYSTEM_V2 = DRAFT_SYSTEM.replace(
+    "Return ONLY JSON:",
+    "- The bracketed [Table N, repeated: ...] text names the table's columns. Use it to read the rows, but quote only\n"
+    "  the paper text that follows it.\nReturn ONLY JSON:")
+
+
+def draft_messages(question: str, hits, feedback: str | None = None, variant: str = "v1"):
     ctx = "\n\n".join(f"[C{i + 1}] {h.chunk.cite()}\n{h.chunk.text}" for i, h in enumerate(hits))
     user = f"Passages:\n{ctx}\n\nQuestion: {question}"
     if feedback:
         user += f"\n\nYour previous answer failed verification: {feedback}\nFix it, or set not_in_papers."
-    return [{"role": "system", "content": DRAFT_SYSTEM}, {"role": "user", "content": user}]
+    return [{"role": "system", "content": DRAFT_SYSTEM_V2 if variant == "v2" else DRAFT_SYSTEM},
+            {"role": "user", "content": user}]
 
 
 CHECK_SYSTEM = """You verify a drafted answer against the cited passages. The quotes show where in each passage the

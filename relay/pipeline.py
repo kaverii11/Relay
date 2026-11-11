@@ -186,7 +186,7 @@ class Pipeline:
         self.qlock = threading.Lock()
         chunk_tok = [len(c.text) // 4 + 12 for c in retriever.chunks]          # +12: the citation header
         self.mean_chunk_tok = sum(chunk_tok) / len(chunk_tok)
-        self.draft_overhead_tok = len(draft_messages("x" * 80, [])[0]["content"]) // 4 + 30
+        self.draft_overhead_tok = len(draft_messages("x" * 80, [], variant=policy.draft_prompt)[0]["content"]) // 4 + 30
 
     def draft_est(self, k):
         return self.draft_overhead_tok + k * self.mean_chunk_tok
@@ -361,13 +361,13 @@ class Pipeline:
             feedback = None
             for round_ in range(2):
                 try:
-                    r = self.call_model(ctx, model, draft_messages(ctx.question, use, feedback), "draft",
+                    r = self.call_model(ctx, model, draft_messages(ctx.question, use, feedback, variant=self.p.draft_prompt), "draft",
                                         out_est=DRAFT_OUT_EST)
                 except DailyLimit as e:
                     if model == BIG and self.daily_hit is None:   # per-day limit on 120b: drop to 20b (separate quota); not in stop mode
                         ctx.ev("ladder", to="small_model", why=e.kind)
                         model, out["degrade_level"] = SMALL, "small_model"
-                        r = self.call_model(ctx, model, draft_messages(ctx.question, use, feedback), "draft",
+                        r = self.call_model(ctx, model, draft_messages(ctx.question, use, feedback, variant=self.p.draft_prompt), "draft",
                                             out_est=DRAFT_OUT_EST)
                     else:
                         raise
@@ -474,7 +474,7 @@ class Pipeline:
             if model == BIG and self.lim.daily_fraction_left(BIG) < self.p.daily_reserve_fraction:
                 ctx.ev("ladder_skip", rung=level, why="daily_reserve")
                 continue
-            n_in = est_tokens(draft_messages(ctx.question, hits[:k]))
+            n_in = est_tokens(draft_messages(ctx.question, hits[:k], variant=self.p.draft_prompt))
             wait, binding = self.lim.predict_wait_s(model, n_in, DRAFT_OUT_EST)
             if binding in ("rpd", "tpd") and wait > 0:
                 continue
@@ -487,7 +487,7 @@ class Pipeline:
     def _busy_eta(self, ctx, query, hits):
         best = (None, math.inf)
         for model in (BIG, SMALL):
-            n_in = est_tokens(draft_messages(ctx.question, hits[:self.setting.fewer[0]]))
+            n_in = est_tokens(draft_messages(ctx.question, hits[:self.setting.fewer[0]], variant=self.p.draft_prompt))
             w, kind = self.lim.predict_wait_s(model, n_in, DRAFT_OUT_EST)
             if w < best[1]:
                 best = (kind, w)
@@ -518,6 +518,11 @@ class Pipeline:
             for q in qs:
                 ch = use[int(cid[1:]) - 1].chunk
                 if not quote_in(q, getattr(ch, "body", ch.text)):   # K §53: never the v2 repeated prefix
+                    # K §61: a quote taken from the repeated prefix is reported as its own reason (same verdict)
+                    pre = getattr(ch, "prefix", None)
+                    if pre and len(match_key(q)) >= MIN_QUOTE_KEY and match_key(q) in match_key(pre):
+                        return False, (f"Quote for {cid} is from the repeated table prefix, not the passage text: "
+                                       f"\"{q[:60]}\"")
                     # K §48: name the real reason. Same verdict either way (quote_in unchanged).
                     if len(match_key(q)) < MIN_QUOTE_KEY:
                         return False, (f"Quote for {cid} is too short (under {MIN_QUOTE_KEY} letters/digits): "

@@ -7,7 +7,7 @@ window frees.
 
 Arms, both 250 words / 3 pieces / BM25 order, cutoff 0.713, retrieval and gate on the piece body (§56):
   v1 = SETTINGS["chosen"],    Policy()                   (the measured system)
-  v2 = SETTINGS["chosen_v2"], Policy(check_prompt="v2")  (change a: table caption + header prefix; change b:
+  v2 = SETTINGS["chosen_v2"], Policy(check_prompt="v2", draft_prompt="v2")  (change a: table caption + header prefix, and the drafter told to quote only the paper text after it; change b:
                                                           number-provenance check, output cap 800)
 The question file is separate from eval/k_questions.csv (never in its eval/tuning split): set = "new", and an
 `author` column on every row ("K", or the tool's name for questions K did not write). Same safeguards as the
@@ -40,7 +40,7 @@ from relay.pipeline import Pipeline  # noqa: E402
 from relay.retrieval import Retriever, cross_encoder  # noqa: E402
 from relay.service import Service, write_csv  # noqa: E402
 
-ARMS = {"chosen": Policy, "chosen_v2": lambda: Policy(check_prompt="v2")}
+ARMS = {"chosen": Policy, "chosen_v2": lambda: Policy(check_prompt="v2", draft_prompt="v2")}
 
 
 def load_new(path):
@@ -110,7 +110,7 @@ def main():
     print(f"[v1v2] run {run}: target {'REAL Groq' if real else a.base_url}; {len(ids)} questions x {len(names)} arms = "
           f"{n_runs} pipeline runs; 250/3 BM25 order, cutoff {SETTINGS['chosen'].cutoff(Policy())} (both arms), "
           f"retrieval + gate on the piece body; answer cache OFF; deadline {Policy().system_deadline_ms:.0f} ms")
-    print(f"  arms: v1 = chosen (check v1, cap 400); v2 = chosen_v2 (table prefix + check v2, cap {Policy().check_max_tokens_v2})")
+    print(f"  arms: v1 = chosen (draft v1, check v1, cap 400); v2 = chosen_v2 (table prefix + draft v2 'quote only the paper text' + check v2, cap {Policy().check_max_tokens_v2})")
     print(f"  question order (seed {a.seed}): {','.join(ids)}; arms rotated per question")
     for q in ids:
         p = pool[q]
@@ -183,6 +183,14 @@ def main():
     meta.update(finished=dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"), stopped=stopped,
                 ledger_after=usage_24h(), requests_sent=budget.run_sent if budget else None)
     (ROOT / f"raw/meta_{run}.json").write_text(json.dumps(meta, indent=2))
+    # K §61: quotes taken from the repeated table prefix are reported separately (code check reason)
+    for nm in names:
+        ev = [json.loads(l) for l in open(ROOT / f"raw/events_{run}_{nm}.jsonl")]
+        cks = [e for d in ev for e in d["events"] if e["ev"] == "check"]
+        pre = [e for e in cks if (e.get("code_why") or "").find("from the repeated table prefix") >= 0]
+        print(f"  {nm}: checks {len(cks)}; failed because a quote came from the table prefix: {len(pre)}; "
+              f"other code-check failures: {sum(not e.get('code_ok') for e in cks) - len(pre)}; "
+              f"model-check failures: {sum(e.get('code_ok') and e.get('model_ok') is False for e in cks)}")
     print(f"[v1v2] {run}: {len(rows)} rows -> raw/results_{run}.csv; then eval/blind_reading.py {run}")
 
 

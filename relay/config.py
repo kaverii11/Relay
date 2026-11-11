@@ -68,6 +68,7 @@ class Policy:
     check_mode: str = "both"
     check_effort: str = "low"              # K §15: test "medium" later
     check_prompt: str = "v1"               # "v2" (K §51 b): name each number's table row/column or sentence
+    draft_prompt: str = "v1"               # "v2" (K §61, part of a): the drafter is told the table prefix is not quotable
     check_max_tokens_v2: int = 800         # K §59: raised with (b); CC's value: the draft's cap, 2.5x the longest
                                            # uncut v2 check reply (314 of 39; one reply hit the old 400 cap)
     # --- degradation + budget (DECISIONS §2, §4)
