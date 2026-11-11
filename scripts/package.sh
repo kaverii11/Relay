@@ -2,7 +2,7 @@
 # Build the Drive folder (K, 2026-11-11 §52 item 11). Re-run after every change; it rebuilds from scratch.
 #   sh scripts/package.sh [OUT]        default OUT = ~/Relay_submission
 # In:  code, results.csv, raw/ (with probe/raw/), the write-up, DECISIONS.md, README, and a conversations/ slot
-#      for TWO exports (this Claude Code session, K's claude.ai chat; the Gemini chat was temporary, not exportable).
+#      for TWO exports (this Claude Code session, K's claude.ai chat; the Gemini assistant in Google Sheets keeps no exportable history).
 # Out: .env, the key, .venv, .git, caches, data/ (chunk files, rebuilt on first run), papers/ (fetched by
 #      library/fetch_papers.py at the pinned versions).
 set -e
@@ -26,8 +26,8 @@ Put the two exports here, unedited:
 1. `claude_code_session.*`: this Claude Code session (the one that built and ran everything).
 2. `claude_ai_chat.*`: Kaveri's claude.ai chat (the second assistant that reviewed plans and results).
 
-Not attached: Gemini (used only to tidy the English of text Kaveri wrote) ran in a temporary chat, which is not
-saved and cannot be exported.
+Not attached: Gemini, the assistant built into Google Sheets (used only to tidy the English and formatting of
+question sheets Kaveri wrote). It keeps no exportable history.
 EOF
 echo "built $OUT"
 find "$OUT" -type f | wc -l | xargs echo "files:"
