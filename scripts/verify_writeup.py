@@ -149,7 +149,8 @@ def main():
         want = [str(n), want_correct, pc("wrong"), pc("refused_correctly"), want_tok, ft, tot]
         for name, g, w in zip(("asked", "correct", "wrong", "refused ok", "tokens", "first token", "total"), row[1:8], want):
             cmp(f"3 {st} {name}", g, w)
-        rw = re.search(r"Refused wrongly \(the rest of each row\): ([\d.]+) / ([\d.]+) / ([\d.]+) %", md)
+        rw = (re.search(r"Refused wrongly \(the rest of each row\): ([\d.]+) / ([\d.]+) / ([\d.]+) %", md)
+              or re.search(r"False refusals:\*\* ([\d.]+)% / ([\d.]+)% / ([\d.]+)%", md))
         if rw:
             idx = ["w250_k6_rr1", "w250_k6_rr0", "w250_k3_rr0"].index(st)
             cmp(f"3 {st} refused wrongly (note)", rw.group(idx + 1), pc("refused_wrongly"))
