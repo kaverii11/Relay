@@ -116,11 +116,11 @@ def main():
         ok = sum(r["status"] == "ok" for r in rs)
         unv = sum(r["status"] == "ok" and r["reply_kind"] == "unverified" for r in rs)
         toks = sum(int(r["tokens_in"]) + int(r["tokens_out"]) for r in rs)
-        want = [f"{pc('ok')} ({100 * unv / n:.1f})", pc("rate_limited"), pc("timeout"),
+        want = [f"{pc('ok')} ({100 * unv / n:.1f})", pc("rate_limited"), pc("timeout"), pc("error"),
                 f"{np.mean([int(r['retries']) for r in rs]):.2f}", str(peak_queue(rs)),
                 f"{toks / ok:.0f}" if ok else "no answers",
                 f"$0 billed (free tier); ${paid_cost(rs) / ok * 1000:.3f} at paid prices"]
-        for name, g, w in zip(("succeeded", "rate-limited", "timed out", "retries", "peak queue", "tokens/answer", "cost"), row[1:8], want):
+        for name, g, w in zip(("succeeded", "rate-limited", "timed out", "errors", "retries", "peak queue", "tokens/answer", "cost"), row[1:9], want):
             cmp(f"2b {key[0]} [{key[1]}] {name}", g, w)
     # Table 3
     qf = {q["id"]: q["answerable"].strip().lower() == "yes" for q in csv.DictReader(open(ROOT / "eval/k_questions.csv"))}
