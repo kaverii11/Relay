@@ -32,6 +32,7 @@ from __future__ import annotations
 import csv
 import datetime as dt
 import sys
+from pathlib import Path
 from collections import defaultdict
 
 import numpy as np
@@ -120,7 +121,7 @@ def main(path):
         dur = max(ends) - starts[0]
         rate = len(rs) / (starts[-1] - starts[0]) * 60 if len(rs) > 1 else float("nan")
         got = [r for r in rs if r["status"] == "ok" and f(r["first_token_ms"]) is not None]
-        no_tok = f"; no token {100 * (len(rs) - len(got)) / len(rs):.0f}%"
+        no_tok = f"; no token {100 * (len(rs) - len(got)) / len(rs):.1f}%"
         ft = pcts([f(r["first_token_ms"]) for r in got])
         tot = pcts([f(r["total_ms"]) for r in got])
         busy = [f(r["total_ms"]) for r in rs if r["reply_kind"] == "busy"]
@@ -167,10 +168,13 @@ def main(path):
     graded = [r for r in rows if r["answer_grade"]]
     if graded:
         print("\nTable 3: retrieval settings (real Groq, graded rows only)")
-        print("| Setting | Questions asked | Correct and cited % | Wrong % | Correctly refused % | (Refused wrongly %) | "
-              "Tokens per question | Tokens per drafted answer | First token p50 / p95 (ms) | Total time p50 / p95 (ms) | "
-              "Limiter wait p50 / max (ms) |")
-        print("|---|---|---|---|---|---|---|---|---|---|---|")
+        # answerable / unanswerable is a property of the QUESTION, not of a run: read from the question file
+        qf = Path(__file__).resolve().parents[1] / "eval/k_questions.csv"
+        ans_of = {q["id"]: q["answerable"].strip().lower() == "yes" for q in csv.DictReader(open(qf))} if qf.exists() else {}
+        print("| Setting | Questions asked | Correct and cited % | Correct of answerable | Wrong % | Correctly refused % | "
+              "(Refused wrongly %) | Tokens per question | Tokens per drafted answer | First token p50 / p95 (ms) | "
+              "Total time p50 / p95 (ms) | Limiter wait p50 / max (ms) |")
+        print("|---|---|---|---|---|---|---|---|---|---|---|---|")
         g = defaultdict(list)
         for r in graded:
             g[r["retrieval_setting"]].append(r)
@@ -186,12 +190,16 @@ def main(path):
             ft = pcts([None if f(r["first_token_ms"]) is None else f(r["first_token_ms"]) - w for r, w in zip(rs, lw)], (50, 95))
             tot = pcts([f(r["total_ms"]) - w if r["status"] == "ok" else None for r, w in zip(rs, lw)], (50, 95))
             wl = sorted(lw)
-            print(f"| {st} | {n} | {pc('correct'):.1f} | {pc('wrong'):.1f} | {pc('refused_correctly'):.1f} | "
+            na = [r for r in rs if ans_of.get(r["request_id"])]
+            coa = f"{sum(r['answer_grade'] == 'correct' for r in na)}/{len(na)}" if ans_of else "not measured"
+            print(f"| {st} | {n} | {pc('correct'):.1f} | {coa} | {pc('wrong'):.1f} | {pc('refused_correctly'):.1f} | "
                   f"{pc('refused_wrongly'):.1f} | {toks:.0f} (n={n}) | {tda} | {ft} | {tot} | "
                   f"{wl[len(wl) // 2]:.0f} / {wl[-1]:.0f} (n={len(wl)}) |")
 
 
 def footnote():
+    print("\nTable 3: n = 20 questions per setting (13 answerable, 7 not), one run each, graded by hand from a blinded "
+          "copy. One question is 5.0 percentage points, so differences of 1-2 questions between settings are noise.")
     print("\nPrices: Groq on-demand, USD per 1M tokens: gpt-oss-120b $0.15 in / $0.60 out; gpt-oss-20b "
           "$0.075 in / $0.30 out. Source: https://console.groq.com/docs/model/openai/gpt-oss-120b and "
           "https://console.groq.com/docs/model/openai/gpt-oss-20b, read 2026-11-09 (pages show no date). "
