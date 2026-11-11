@@ -2,7 +2,7 @@
 # Build the Drive folder (K, 2026-11-11 §52 item 11). Re-run after every change; it rebuilds from scratch.
 #   sh scripts/package.sh [OUT]        default OUT = ~/Relay_submission
 # In:  code, results.csv, raw/ (with probe/raw/), the write-up, DECISIONS.md, README, and a conversations/ slot
-#      for THREE exports (this Claude Code session, K's claude.ai chat, K's Gemini chat).
+#      for TWO exports (this Claude Code session, K's claude.ai chat; the Gemini chat was temporary, not exportable).
 # Out: .env, the key, .venv, .git, caches, data/ (chunk files, rebuilt on first run), papers/ (fetched by
 #      library/fetch_papers.py at the pinned versions).
 set -e
@@ -21,11 +21,13 @@ if [ -d conversations ]; then rsync -a --exclude='.DS_Store' conversations/ "$OU
 [ -f "$OUT/conversations/README.md" ] || cat > "$OUT/conversations/README.md" <<'EOF'
 # Conversation history (the brief: "your real conversation history with it, not a cleaned-up one")
 
-Put the three exports here, unedited:
+Put the two exports here, unedited:
 
 1. `claude_code_session.*`: this Claude Code session (the one that built and ran everything).
 2. `claude_ai_chat.*`: Kaveri's claude.ai chat (the second assistant that reviewed plans and results).
-3. `gemini_chat.*`: the Gemini chat used to tidy the English and formatting of text Kaveri wrote.
+
+Not attached: Gemini (used only to tidy the English of text Kaveri wrote) ran in a temporary chat, which is not
+saved and cannot be exported.
 EOF
 echo "built $OUT"
 find "$OUT" -type f | wc -l | xargs echo "files:"
