@@ -317,19 +317,30 @@ class Pipeline:
             # [2] retrieve (tool). gate_input "max" (K §29): score the raw question and the rewrite; the
             # higher cross-encoder score is the gate, and the drafter gets THAT query's passages.
             gate_raw = gate_rw = None
+            # v3 change B (K 2026-11-12): the understand step's paper hint shapes BOTH searches. The raw pass started
+            # before the hint existed, so with a usable hint it is redone (BM25 + 3 cross-encoder pairs, local).
+            papers = hints.get("papers") if getattr(self.setting, "paper_hint", False) else None
+            hinted = bool(papers) and 1 <= len(self.ret.hinted_papers(papers)) <= 2
+
+            def raw_result():
+                return self.ret.search(ctx.question, papers=papers) if hinted else raw_pass.result()
             if raw_pass is not None and query == ctx.question:          # empty / skipped rewrite: one pass
-                hits, gate, tms = raw_pass.result()
+                hits, gate, tms = raw_result()
                 gate_raw = gate_rw = gate
                 by = "same"
                 bm_top = tms.pop("bm25_top", hits)
             else:
-                hits, gate, tms = self.ret.search(query)
+                hits, gate, tms = self.ret.search(query, papers=papers)
                 gate_rw, by = gate, "rewrite"
                 bm_top = tms.pop("bm25_top", hits)
                 if raw_pass is not None:
-                    h_raw, gate_raw, t_raw = raw_pass.result()
+                    h_raw, gate_raw, t_raw = raw_result()
                     if gate_raw > gate:
                         hits, gate, by, bm_top = h_raw, gate_raw, "raw", t_raw.get("bm25_top", h_raw)
+                        tms["paper_hint_added"] = t_raw.get("paper_hint_added", [])
+            added = tms.pop("paper_hint_added", [])
+            if papers is not None:
+                ctx.ev("paper_hint", papers=papers, used=hinted, added=added)
             out["gate"], out["gate_by"] = round(gate, 3), by
             ctx.rerank_ms = round(tms["ce_ms"], 1)      # the pass on the critical path (the raw one overlapped understand)
             ctx.ev("retrieve", **{k: round(v, 1) for k, v in tms.items()}, gate=round(gate, 3), gate_by=by,
@@ -359,6 +370,7 @@ class Pipeline:
 
             # [4] draft  -> [5] check, with ONE redraft loop
             feedback = None
+            rejected = []      # v3 change A: (passage index, quote key) of claims the model check rejected
             for round_ in range(2):
                 try:
                     r = self.call_model(ctx, model, draft_messages(ctx.question, use, feedback, variant=self.p.draft_prompt), "draft",
@@ -382,9 +394,18 @@ class Pipeline:
                     return self._refuse(ctx, out, use, "drafter")
                 ok, why = self._code_check(d, use)
                 code_ok, code_why, model_ok, model_why = ok, why, None, ""
-                if ok and self._needs_model_check(hints):
+                keys = [(str(c.get("chunk", "")), match_key(q)) for c in d.get("claims") or [] for q in claim_quotes(c)]
+                rep_ = next(((cid, q) for cid, q in keys for rc, rq in rejected
+                             if cid == rc and q and rq and (q in rq or rq in q)), None) if ok else None
+                if rep_ is not None and self.p.sticky_check_fail:
+                    ok, why = False, ("Repeats a claim the check already rejected (same passage, same quote); "
+                                      "use a different passage or set not_in_papers.")
+                    ctx.ev("sticky_fail", chunk=rep_[0])
+                elif ok and self._needs_model_check(hints):
                     ok, why = self._model_check(ctx, d, use)
                     model_ok, model_why = ok, why
+                    if not ok:
+                        rejected += keys
                 # K (2026-11-11, item 4): both verdicts recorded separately, so code-only vs both (§8) comes from one run
                 ctx.ev("check", round=round_, ok=ok, why=why, redraft=round_ == 1,
                        code_ok=code_ok, code_why=code_why, model_ok=model_ok, model_why=model_why)

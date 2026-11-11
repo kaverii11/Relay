@@ -19,6 +19,10 @@ class RetrievalSetting:
     fewer_k: int | None = None
     fewer_rerank: bool | None = None
     chunker: str = "v1"   # "v2" (K §51): table caption + header repeated on every table piece; rows tagged _v2
+    # v3 (K 2026-11-12, change B): the understand step's "papers" hint (1-2 papers) guarantees each named paper its
+    # best BM25 piece among the k sent. Rows tagged _ph.
+    paper_hint: bool = False
+    paper_hint_mode: str = "replace"   # "replace": swap out the lowest piece; "append": send it as an extra piece
 
     def cutoff(self, policy) -> float:
         return self.gate_threshold if self.gate_threshold is not None else policy.gate_threshold
@@ -31,7 +35,8 @@ class RetrievalSetting:
 
     @property
     def name(self):
-        return f"w{self.words}_k{self.k}_rr{int(self.rerank)}" + ("_v2" if self.chunker == "v2" else "")
+        return (f"w{self.words}_k{self.k}_rr{int(self.rerank)}" + ("_v2" if self.chunker == "v2" else "")
+                + (("_pha" if self.paper_hint_mode == "append" else "_ph") if self.paper_hint else ""))
 
 
 # K (2026-11-11 §44), from the offline recall table and her midpoint rule (raw/settings_table_*, raw/cutoffs_by_size_*):
@@ -69,6 +74,9 @@ class Policy:
     check_effort: str = "low"              # K §15: test "medium" later
     check_prompt: str = "v1"               # "v2" (K §51 b): name each number's table row/column or sentence
     draft_prompt: str = "v1"               # "v2" (K §61, part of a): the drafter is told the table prefix is not quotable
+    # v3 (K 2026-11-12, change A): a redraft that repeats a claim (same passage, same quote) the model check already
+    # rejected fails without a second model check, so the redraft cannot simply re-roll the checker
+    sticky_check_fail: bool = False
     check_max_tokens_v2: int = 800         # K §59: raised with (b); CC's value: the draft's cap, 2.5x the longest
                                            # uncut v2 check reply (314 of 39; one reply hit the old 400 cap)
     # --- degradation + budget (DECISIONS §2, §4)
@@ -89,4 +97,10 @@ SETTINGS["chosen"] = SETTINGS["medium_k3_norerank"]
 # v2 (K §51, §53): the chosen setting on the v2 chunker; its cutoff is re-derived on tuning (K's midpoint rule)
 SETTINGS["chosen_v2"] = RetrievalSetting(250, 3, False, gate_threshold=0.713, fewer_k=3, fewer_rerank=False, chunker="v2")
 # K §56: with retrieval and the gate on the body only, v2 scores = v1 scores, so the v1 cutoff 0.713 stands.
+# v3 (K 2026-11-12): v2 + paper hint (B); Policy for v3 adds sticky_check_fail (A). Cutoff: re-derived on tuning
+# by eval/v3_offline.py (K's midpoint rule); 0.713 until then.
+SETTINGS["chosen_v3"] = RetrievalSetting(250, 3, False, gate_threshold=0.713, fewer_k=3, fewer_rerank=False, chunker="v2",
+                                         paper_hint=True)
+SETTINGS["chosen_v3a"] = RetrievalSetting(250, 3, False, gate_threshold=0.713, fewer_k=3, fewer_rerank=False, chunker="v2",
+                                          paper_hint=True, paper_hint_mode="append")
 CHOSEN = "chosen"          # e.g. eval/e2e.py --setting chosen; loadgen --setting chosen (not used for Tables 2a/2b)

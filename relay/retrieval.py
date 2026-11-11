@@ -55,6 +55,45 @@ class Retriever:
         # K §56 (CC's suggestion, accepted): retrieval and the gate score the piece's BODY only; the v2 table
         # prefix goes to the drafter and the checker (chunk.text), never into BM25 or the cross-encoder.
         self.bm = BM25Okapi([_tok(c.body) for c in self.chunks])
+        self.by_paper: dict[str, list[int]] = {}
+        for i, c in enumerate(self.chunks):
+            self.by_paper.setdefault(c.paper, []).append(i)
+
+    def hinted_papers(self, papers) -> list[str]:
+        """The understand step's "papers" hint, matched to our paper ids (with or without the version)."""
+        out = []
+        for x in ([papers] if isinstance(papers, str) else papers or []):
+            x = str(x).strip()
+            m = next((pid for pid in self.by_paper if x and (pid == x or pid.split("v")[0] == x.split("v")[0])), None)
+            if m and m not in out:
+                out.append(m)
+        return out
+
+    def _with_papers(self, scores, sel, papers):
+        """v3 change B (K 2026-11-12): when the hint names 1-2 papers, each named paper missing from the k pieces gets
+        its best BM25 piece, replacing the lowest-ranked piece that is not the only piece of a named paper.
+        A hint naming all three papers says nothing, so it is ignored. Only BM25 order (no re-rank) settings."""
+        named = self.hinted_papers(papers)
+        if not self.s.paper_hint or not 1 <= len(named) <= 2:
+            return sel, []
+        sel, added = list(sel), []
+        for pid in named:
+            if any(self.chunks[i].paper == pid for i in sel):
+                continue
+            best = max(self.by_paper[pid], key=lambda i: scores[i])
+            if scores[best] <= 0:
+                continue
+            if self.s.paper_hint_mode == "append":       # keep all k pieces; the named paper's piece is extra
+                sel.append(best)
+                added.append(self.chunks[best].cite())
+                continue
+            for j in range(len(sel) - 1, -1, -1):
+                pj = self.chunks[sel[j]].paper
+                if pj not in named or sum(self.chunks[i].paper == pj for i in sel) > 1:
+                    sel[j] = best
+                    added.append(self.chunks[best].cite())
+                    break
+        return sel, added
 
     def _ce_scores(self, query: str, chunks: list[Chunk]) -> list[float]:
         pairs, owner = [], []
@@ -73,7 +112,7 @@ class Retriever:
             best[o] = max(best[o], float(sc))
         return best
 
-    def search(self, query: str, k: int | None = None) -> tuple[list[Hit], float, dict]:
+    def search(self, query: str, k: int | None = None, papers=None) -> tuple[list[Hit], float, dict]:
         k = k or self.s.k
         t0 = time.perf_counter()
         scores = self.bm.get_scores(_tok(query))
@@ -87,10 +126,14 @@ class Retriever:
             # BM25's own top-k with the scores already computed: the fewer-chunks rung (K §44) sends these
             bm_top = [Hit(cand[j], float(scores[top[j]]), ce[j]) for j in range(min(k, len(cand)))]
         else:
-            cand = [self.chunks[i] for i in top[:k]]
+            sel, added = self._with_papers(scores, top[:k], papers)
+            cand = [self.chunks[i] for i in sel]
             ce = self._ce_scores(query, cand)
-            hits = [Hit(c, float(scores[i]), s) for c, i, s in zip(cand, top[:k], ce)]
+            hits = [Hit(c, float(scores[i]), s) for c, i, s in zip(cand, sel, ce)]
             bm_top = hits
         t2 = time.perf_counter()
         gate = max(h.ce for h in hits) if hits else -1e9
-        return hits, gate, {"bm25_ms": (t1 - t0) * 1000, "ce_ms": (t2 - t1) * 1000, "bm25_top": bm_top}
+        info = {"bm25_ms": (t1 - t0) * 1000, "ce_ms": (t2 - t1) * 1000, "bm25_top": bm_top}
+        if not self.s.rerank and added:
+            info["paper_hint_added"] = added
+        return hits, gate, info

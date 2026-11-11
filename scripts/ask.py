@@ -37,7 +37,10 @@ def main():
     ap.add_argument("--base-url", default=None, help="stand-in URL, e.g. http://127.0.0.1:8099/v1")
     a = ap.parse_args()
     real = a.base_url is None
-    setting, pol = SETTINGS[a.setting], Policy()
+    setting = SETTINGS[a.setting]
+    # each arm's Policy, as eval/run_v1v2.py runs them: v2 = new check + draft prompts; v3 = v2 + sticky check failure
+    pol = (Policy(check_prompt="v2", draft_prompt="v2", sticky_check_fail=True) if a.setting.startswith("chosen_v3")
+           else Policy(check_prompt="v2", draft_prompt="v2") if a.setting == "chosen_v2" else Policy())
     ret = Retriever(setting)
     cross_encoder()
     hits, gate, _ = ret.search(a.question)
