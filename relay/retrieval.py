@@ -29,6 +29,7 @@ WINDOW_WORDS = 300
 
 
 def cross_encoder():
+    """Load the MiniLM cross-encoder once and share it (it scores query-passage pairs)."""
     global _CE
     with _CE_INIT_LOCK:
         if _CE is None:
@@ -39,12 +40,14 @@ def cross_encoder():
 
 @dataclass
 class Hit:
+    """A retrieved piece with its BM25 score and cross-encoder score."""
     chunk: Chunk
     bm25: float
     ce: float
 
 
 class Retriever:
+    """The retrieval tool: BM25 over the pieces, cross-encoder scores for the gate (and optional re-rank)."""
     def __init__(self, setting: RetrievalSetting):
         self.s = setting
         v2 = getattr(setting, "chunker", "v1") == "v2"
@@ -96,6 +99,7 @@ class Retriever:
         return sel, added
 
     def _ce_scores(self, query: str, chunks: list[Chunk]) -> list[float]:
+        """Cross-encoder score per piece (long pieces scored in windows; best window wins)."""
         pairs, owner = [], []
         for i, c in enumerate(chunks):
             words = c.body.split()                 # K §56: body only (= text for v1 pieces)
@@ -113,6 +117,7 @@ class Retriever:
         return best
 
     def search(self, query: str, k: int | None = None, papers=None) -> tuple[list[Hit], float, dict]:
+        """Top-k pieces for a query and the gate score (best cross-encoder score among them)."""
         k = k or self.s.k
         t0 = time.perf_counter()
         scores = self.bm.get_scores(_tok(query))

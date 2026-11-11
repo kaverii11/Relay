@@ -18,6 +18,7 @@ Do not answer the question."""
 
 
 def understand_messages(question: str):
+    """Messages for step 1: the 20b rewrite (search query, paper hint, flags)."""
     return [{"role": "system", "content": UNDERSTAND_SYSTEM},
             {"role": "user", "content": question}]
 
@@ -44,6 +45,7 @@ DRAFT_SYSTEM_V2 = DRAFT_SYSTEM.replace(
 
 
 def draft_messages(question: str, hits, feedback: str | None = None, variant: str = "v1"):
+    """Messages for step 4: numbered passages + question (+ the check's feedback on a redraft)."""
     ctx = "\n\n".join(f"[C{i + 1}] {h.chunk.cite()}\n{h.chunk.text}" for i, h in enumerate(hits))
     user = f"Passages:\n{ctx}\n\nQuestion: {question}"
     if feedback:

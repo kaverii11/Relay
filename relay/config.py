@@ -9,6 +9,7 @@ BIG = "openai/gpt-oss-120b"
 
 @dataclass
 class RetrievalSetting:
+    """How the papers are split and fetched: piece size, pieces sent, re-rank, cutoff, chunker, paper hint."""
     words: int          # piece size (words per chunk)
     k: int              # pieces sent to the drafting model
     rerank: bool        # cross-encoder re-orders BM25's top-20 (the gate uses the cross-encoder either way)
@@ -25,16 +26,19 @@ class RetrievalSetting:
     paper_hint_mode: str = "replace"   # "replace": swap out the lowest piece; "append": send it as an extra piece
 
     def cutoff(self, policy) -> float:
+        """This setting's gate cutoff (its own, else the Policy default)."""
         return self.gate_threshold if self.gate_threshold is not None else policy.gate_threshold
 
     @property
     def fewer(self) -> tuple[int, bool]:
+        """The ladder's fewer-pieces rung: (pieces, re-rank) to send when the full rung won't fit."""
         k = self.fewer_k if self.fewer_k is not None else max(2, self.k // 2)
         rr = self.fewer_rerank if self.fewer_rerank is not None else self.rerank
         return k, rr
 
     @property
     def name(self):
+        """Short tag used in results.csv's retrieval_setting column, e.g. w250_k3_rr0_v2."""
         return (f"w{self.words}_k{self.k}_rr{int(self.rerank)}" + ("_v2" if self.chunker == "v2" else "")
                 + (("_pha" if self.paper_hint_mode == "append" else "_ph") if self.paper_hint else ""))
 
@@ -57,6 +61,7 @@ SETTINGS = {
 @dataclass
 class Policy:
     # --- "fast" (DECISIONS §1): PLACEHOLDERS until the end-to-end pipeline is measured
+    """Every behaviour knob outside retrieval: deadline, gate, retries, checks, ladder, reserve."""
     system_deadline_ms: float = 8000       # K (2026-11-10 §37): 8 s, set after the evening e2e set (first token p95 5.7 s)
     # --- refusal gate (DECISIONS §29, K 2026-11-10): K's midpoint rule on max(raw, rewrite), tuning questions only
     gate_threshold: float = 0.875          # midpoint of highest refuse 0.354 (Q51) and lowest answerable above it 1.395 (Q42)
@@ -90,6 +95,7 @@ class Policy:
     extra: dict = field(default_factory=dict)
 
     def as_dict(self):
+        """The policy as a dict, saved in each run's meta file."""
         return asdict(self)
 
 

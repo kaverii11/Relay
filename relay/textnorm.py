@@ -20,7 +20,9 @@ _LINEBREAK_HYPHEN = re.compile(r"(\w+)-\n(\w+)")
 
 
 def dehyphenate(text: str, vocab: set[str]) -> str:
+    """Join words split across lines ('lan-\nguage' -> 'language') when the joined word is in the papers."""
     def fix(m):
+        """Join one hyphenated pair if the joined word is real, else keep the hyphen."""
         a, b = m.group(1), m.group(2)
         return a + b if (a + b).lower() in vocab else f"{a}-{b}"
     return _LINEBREAK_HYPHEN.sub(fix, text)
@@ -36,6 +38,7 @@ def corpus_vocab(texts) -> set[str]:
 
 
 def match_key(s: str) -> str:
+    """Text reduced to lower-case letters and digits only: what 'word for word' compares."""
     s = unicodedata.normalize("NFKC", s).casefold()
     return re.sub(r"[\W_]+", "", s)
 
@@ -46,5 +49,6 @@ MIN_QUOTE_KEY = 12
 
 
 def quote_in(quote: str, passage: str) -> bool:
+    """True if the quote (>= 12 letters/digits) appears in the passage, ignoring case, spaces and punctuation."""
     q = match_key(quote)
     return len(q) >= MIN_QUOTE_KEY and q in match_key(passage)

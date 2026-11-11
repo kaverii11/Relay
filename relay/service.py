@@ -30,6 +30,7 @@ COLUMNS = ["request_id", "scenario", "source", "start_time", "first_token_ms", "
 
 
 class Service:
+    """Runs the pipeline for many people at once: a queue, worker threads, patience timers, CSV rows."""
     def __init__(self, pipeline: Pipeline, *, workers: int, scenario: str, events_path: Path,
                  variant: str = "", profile: str = ""):
         self.pl, self.scenario, self.variant, self.profile = pipeline, scenario, variant, profile
@@ -42,6 +43,7 @@ class Service:
             threading.Thread(target=self._worker, daemon=True).start()
 
     def submit(self, rid: str, question: str, patience_s: float):
+        """A person asks: start their patience timer and queue the request."""
         cancel = threading.Event()
         t0 = time.perf_counter()
         wall = dt.datetime.now(dt.timezone.utc)
@@ -53,6 +55,7 @@ class Service:
         self.q.put((rid, question, t0, wall, cancel, timer, patience_s))
 
     def _worker(self):
+        """Worker thread: take the next request, run the pipeline, record the row."""
         while True:
             rid, question, t0, wall, cancel, timer, patience = self.q.get()
             ctx = Ctx(rid=rid, question=question, t0=t0, cancel=cancel, deadline_ms=self.pl.p.system_deadline_ms)
@@ -72,6 +75,7 @@ class Service:
                 self.done.notify_all()
 
     def _record(self, rid, question, wall, res):
+        """Turn one pipeline result into a results.csv row (and its event-log line)."""
         row = {"request_id": rid, "scenario": self.scenario, "source": self.pl.source,
                "start_time": wall.isoformat(timespec="milliseconds"),
                "first_token_ms": res["first_token_ms"], "total_ms": res["total_ms"], "status": res["status"],
@@ -98,6 +102,7 @@ class Service:
             self.events_f.flush()
 
     def wait_all(self, timeout=None):
+        """Block until every submitted request has finished (or the timeout)."""
         end = time.time() + (timeout or 1e9)
         with self.done:
             while self.pending and time.time() < end:
@@ -105,6 +110,7 @@ class Service:
 
 
 def write_csv(rows, path: Path, append=False):
+    """Write rows with the results.csv columns."""
     exists = path.exists() and append
     with open(path, "a" if append else "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=COLUMNS)

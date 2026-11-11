@@ -34,10 +34,12 @@ WINDOW_H = 24
 
 
 def _now():
+    """Current UTC time (ledger timestamps)."""
     return dt.datetime.now(dt.timezone.utc)
 
 
 def _read():
+    """The ledger file as a dict (empty if it doesn't exist yet)."""
     return json.loads(LEDGER.read_text()) if LEDGER.exists() else {}
 
 
@@ -58,12 +60,14 @@ def usage_24h(d=None, now=None):
 
 
 class Budget:
+    """Safety caps for one real run: a request cap, and the per-model 24 h token ceiling (170k of 200k)."""
     def __init__(self, run: str, request_cap: int, ceiling: int = CEILING):
         self.run, self.request_cap, self.ceiling = run, request_cap, ceiling
         self.run_sent, self.stopped = 0, None
         self.lock = threading.Lock()
 
     def reserve(self, model, est_in, est_out):
+        """Before a real call: refuse (DailyLimit) if the run cap or the 24 h ceiling would be passed."""
         with self.lock:
             if self.run_sent >= self.request_cap:
                 self.stopped = self.stopped or f"run request cap {self.request_cap} reached"
@@ -76,6 +80,7 @@ class Budget:
             self.run_sent += 1
 
     def record(self, model, tokens_in, tokens_out, status):
+        """After a real call: append it to the ledger so later runs see it in the 24 h window."""
         with self.lock:
             d = _read()
             d.setdefault("calls", []).append([_now().isoformat(timespec="seconds"), model,
@@ -113,6 +118,7 @@ def backfill():
 
 
 def show():
+    """Print the ledger: probe counter and last-24 h tokens per model."""
     d = _read()
     u = usage_24h(d)
     print(f"ledger {LEDGER.relative_to(ROOT)}: probe counter {d.get('sent', 0)}/300; "

@@ -45,26 +45,31 @@ class Cancelled(Exception):
 
 
 class Busy(Exception):
+    """No slot fits before the deadline: carries which limit binds and the wait, for the busy reply."""
     def __init__(self, limit_kind, eta_s):
         super().__init__(limit_kind)
         self.limit_kind, self.eta_s = limit_kind, eta_s
 
 
 class DailyLimit(Exception):
+    """A per-day limit (or our own run cap / 24 h ceiling) was hit: never retried."""
     def __init__(self, model, kind):
         super().__init__(kind)
         self.model, self.kind = model, kind
 
 
 class CallFailed(Exception):
+    """A model call failed for good (retries used up or not allowed)."""
     pass
 
 
 def est_tokens(messages) -> int:
+    """Rough token count for limiter planning: ~4 characters per token."""
     return max(1, sum(len(m["content"]) for m in messages) // 4)
 
 
 def limit_kind(body: str) -> str:
+    """Which limit a Groq 429 body names (rpd / tpd / itpm / rpm / tpm)."""
     b = (body or "").lower()
     for k in ("rpd", "tpd", "itpm", "rpm", "tpm"):
         if f"({k})" in b:
@@ -75,6 +80,7 @@ def limit_kind(body: str) -> str:
 
 
 def parse_json(text: str):
+    """The first {...} object in a model reply, or None if there is none or it does not parse."""
     m = re.search(r"\{.*\}", text or "", re.S)
     if not m:
         return None
@@ -85,6 +91,7 @@ def parse_json(text: str):
 
 
 def normalise_q(q: str) -> str:
+    """Lower-case word string: the exact-match cache key, so spacing and punctuation don't matter."""
     return " ".join(re.findall(r"\w+", q.lower()))
 
 
@@ -96,19 +103,23 @@ class ExactCache:
         self.d, self.lock = {}, threading.Lock()
 
     def key(self, q, setting):
+        """Cache key: question words + retrieval setting + paper versions (a new paper version misses)."""
         return (normalise_q(q), setting, PAPER_VERSIONS)
 
     def get(self, q, setting):
+        """Cached reply for this question and setting, or None."""
         with self.lock:
             return self.d.get(self.key(q, setting))
 
     def put(self, q, setting, value):
+        """Store a checked answer (refusals and busy replies are never cached)."""
         with self.lock:
             self.d[self.key(q, setting)] = value
 
 
 @dataclass
 class Ctx:
+    """Everything about ONE request as it moves through the pipeline: timing, counters, event log."""
     rid: str
     question: str
     t0: float                       # perf_counter at ARRIVAL
@@ -132,9 +143,11 @@ class Ctx:
     events: list = field(default_factory=list)
 
     def ms(self):
+        """Milliseconds since the request arrived."""
         return (time.perf_counter() - self.t0) * 1000
 
     def ev(self, name, **kw):
+        """Append a timestamped event to this request's log (written to raw/events_*.jsonl)."""
         self.events.append({"t_ms": round(self.ms(), 1), "ev": name, **kw})
 
     def sleep(self, s, why):
@@ -157,12 +170,14 @@ class _Async:
         self.t.start()
 
     def _run(self, fn):
+        """Thread body: run fn, keep its result or its exception."""
         try:
             self.r = fn()
         except Exception as e:   # noqa: BLE001
             self.e = e
 
     def result(self):
+        """Wait for the background call; return its result or re-raise its exception."""
         self.t.join()
         if self.e:
             raise self.e
@@ -170,6 +185,7 @@ class _Async:
 
 
 class Pipeline:
+    """The service: understand -> retrieve -> decide -> draft -> check, with limits, ladder and deadline."""
     def __init__(self, *, base_url, api_key, source, setting: RetrievalSetting, policy: Policy,
                  limiter: Limiter, cache: ExactCache | None, retriever: Retriever, budget=None):
         self.base_url, self.api_key, self.source = base_url, api_key, source
@@ -189,10 +205,12 @@ class Pipeline:
         self.draft_overhead_tok = len(draft_messages("x" * 80, [], variant=policy.draft_prompt)[0]["content"]) // 4 + 30
 
     def draft_est(self, k):
+        """Estimated draft prompt size for k pieces (fixed overhead + k average pieces)."""
         return self.draft_overhead_tok + k * self.mean_chunk_tok
 
     # ------------------------------------------------------------------ model calls + retry policy
     def call_model(self, ctx: Ctx, model, messages, kind, effort=None, out_est=SHORT_OUT_EST):
+        """One model call with our limiter, the deadline, retries and budget accounting. Raises Busy / DailyLimit / CallFailed."""
         n_in = est_tokens(messages)
         attempt = 0
         while True:
@@ -278,6 +296,7 @@ class Pipeline:
 
     # ------------------------------------------------------------------ the five steps
     def run(self, ctx: Ctx) -> dict:
+        """Answer one question; returns the reply plus every field a results.csv row needs."""
         out = {"degrade_level": "full", "model": "", "answer": "", "kind": "", "gate": None,
                "citations": [], "query": None}
         # K §44 (Table 2a/2b column): at arrival, is the 120b day budget still serving drafts?
@@ -323,6 +342,7 @@ class Pipeline:
             hinted = bool(papers) and 1 <= len(self.ret.hinted_papers(papers)) <= 2
 
             def raw_result():
+                """The raw-question search: redone with the paper hint when there is one, else the pass started earlier."""
                 return self.ret.search(ctx.question, papers=papers) if hinted else raw_pass.result()
             if raw_pass is not None and query == ctx.question:          # empty / skipped rewrite: one pass
                 hits, gate, tms = raw_result()
@@ -496,6 +516,7 @@ class Pipeline:
         return base + [h for h in extra if h not in base]
 
     def _plan_draft(self, ctx, query, hits):
+        """First ladder rung (model, pieces) whose draft can still finish before the deadline; None = busy."""
         for model, k, level in self._rungs():
             if model == BIG and self.lim.daily_fraction_left(BIG) < self.p.daily_reserve_fraction:
                 ctx.ev("ladder_skip", rung=level, why="daily_reserve")
@@ -511,6 +532,7 @@ class Pipeline:
         return None
 
     def _busy_eta(self, ctx, query, hits):
+        """Shortest predicted wait over both models, and the limit that binds: the busy reply's ETA."""
         best = (None, math.inf)
         for model in (BIG, SMALL):
             n_in = est_tokens(draft_messages(ctx.question, hits[:self.setting.fewer[0]], variant=self.p.draft_prompt))
@@ -520,10 +542,12 @@ class Pipeline:
         return best
 
     def _daily_eta(self, model):
+        """Predicted wait until a typical question (~3300 tokens) fits this model's daily limits again."""
         w, _ = self.lim.predict_wait_s(model, 3300, 0)
         return w
 
     def _needs_model_check(self, hints):
+        """Whether to run the 20b support check (always in 'both' mode, the mode we ran)."""
         if self.p.check_mode == "both":
             return True
         if self.p.check_mode == "code_only":
@@ -531,6 +555,7 @@ class Pipeline:
         return bool(hints.get("needs_numbers") or hints.get("cross_paper"))   # "adaptive", §8 option (iii)
 
     def _code_check(self, d, use):
+        """Deterministic check: every claim cites a real passage and every quote is in it word for word."""
         claims = d.get("claims") or []
         if not claims or not d.get("answer"):
             return False, "No claims with quotes."
@@ -557,6 +582,7 @@ class Pipeline:
         return True, ""
 
     def _model_check(self, ctx, d, use):
+        """20b reads the cited passages and says whether they support the claims."""
         r = self.call_model(ctx, SMALL, check_messages(ctx.question, d["answer"], d["claims"], use,
                                                        variant=self.p.check_prompt), "check",
                             effort=self.p.check_effort)
@@ -568,11 +594,13 @@ class Pipeline:
         return False, "; ".join(j.get("problems") or ["checker did not confirm support"])
 
     def _render(self, answer, use):
+        """Replace [C1]-style ids in the answer with real citations ([paper §section p.N])."""
         return re.sub(r"\[C(\d+)\]", lambda m: use[int(m.group(1)) - 1].chunk.cite()
                       if 1 <= int(m.group(1)) <= len(use) else m.group(0), answer)
 
     # ------------------------------------------------------------------ replies (no model calls)
     def _refuse(self, ctx, out, hits, why):
+        """'The papers don't say' reply with the three nearest passages; no 120b call."""
         near = ", ".join(h.chunk.cite() for h in hits[:3])
         out.update(kind="refusal", answer=(
             "The papers don't say. I searched all three papers (Attention Is All You Need v7, Moshi v1, "
@@ -595,6 +623,7 @@ class Pipeline:
         return self._deliver(ctx, out, "ok")
 
     def _busy(self, ctx, out, limit_kind, eta_s, path="mid"):
+        """The busy reply, filled by code (no model call): which limit, and when to ask again."""
         ctx.busy_path = path
         eta = "under a minute" if eta_s < 60 else (f"about {math.ceil(eta_s / 60)} min" if eta_s < 3600
                                                     else f"about {eta_s / 3600:.1f} h")
@@ -609,10 +638,12 @@ class Pipeline:
         return self._finish(ctx, out, "rate_limited", first_token=False)
 
     def _deliver(self, ctx, out, status):
+        """Send the reply: first token = now (the whole checked reply goes at once)."""
         ctx.ev("first_token")
         return self._finish(ctx, out, status, first_token=True)
 
     def _finish(self, ctx, out, status, first_token=False, gave_up=False):
+        """Close the request: status, timings, counters and events for the CSV row and the log."""
         t = ctx.ms()
         return {**out, "status": status, "first_token_ms": round(t, 1) if first_token else None,
                 "total_ms": round(t, 1), "gave_up": int(gave_up), "retries": ctx.retries, "calls": ctx.calls,

@@ -18,6 +18,7 @@ GROQ_BASE = "https://api.groq.com/openai/v1"
 
 @dataclass
 class CallResult:
+    """What one streamed model call returned: status, text, timings, tokens, rate-limit headers, error."""
     status: int                 # HTTP status (0 = network error / timeout)
     text: str = ""
     ttft_ms: float | None = None  # time to first ANSWER (content) token - what a person sees
@@ -31,10 +32,10 @@ class CallResult:
     headers: dict = field(default_factory=dict)   # x-ratelimit-*, retry-after, etc.
     error_body: str = ""
     error_kind: str = ""        # "", "timeout", "network", "http", "truncated"
-    started_output: bool = False  # did any content token arrive?
 
 
 def _keep_headers(h: httpx.Headers) -> dict:
+    """Keep only the rate-limit and request-id headers worth logging."""
     return {k: v for k, v in h.items()
             if k.startswith("x-ratelimit") or k in ("retry-after", "x-request-id", "date")
             or k.startswith("x-groq")}
@@ -43,6 +44,7 @@ def _keep_headers(h: httpx.Headers) -> dict:
 def stream_chat(messages, model, *, base_url=GROQ_BASE, api_key=None, max_tokens=400,
                 temperature=0.0, timeout_s=30.0, client: httpx.Client | None = None,
                 extra=None) -> CallResult:
+    """One streaming chat call (Groq or the stand-in), timing the first answer token. Never raises."""
     api_key = api_key or os.environ.get("GROQ_API_KEY", "")
     body = {"model": model, "messages": messages, "max_tokens": max_tokens,
             "temperature": temperature, "stream": True,
@@ -95,7 +97,6 @@ def stream_chat(messages, model, *, base_url=GROQ_BASE, api_key=None, max_tokens
                     if piece:
                         if res.ttft_ms is None:
                             res.ttft_ms = (time.perf_counter() - t0) * 1000
-                            res.started_output = True
                         parts.append(piece)
             res.text = "".join(parts)
             res.reasoning = "".join(rparts)

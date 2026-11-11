@@ -27,6 +27,7 @@ PAPERS = {
 
 @dataclass
 class Chunk:
+    """One piece of a paper: its text, where it came from (paper, section, pages) and table info (v2)."""
     id: str
     paper: str
     title: str
@@ -44,6 +45,7 @@ class Chunk:
         return self.text[len(self.prefix) + 1:] if self.prefix else self.text
 
     def cite(self) -> str:
+        """Citation string shown to the person, e.g. [1706.03762v7 §5.3 p.7]."""
         pg = f"p.{self.page_start}" if self.page_start == self.page_end else f"pp.{self.page_start}-{self.page_end}"
         return f"[{self.paper} §{self.section.split(' ')[0]} {pg}]"
 
@@ -90,6 +92,7 @@ def _numbered_toc(doc):
 
 
 def _is_figure_noise(text: str) -> bool:
+    """True for a text block that looks like chart labels (> 50 % lines of <= 3 chars). Known bug: also drops short table rows."""
     lines = [l for l in text.splitlines() if l.strip()]
     if not lines:
         return True
@@ -101,6 +104,7 @@ _VOCAB = None
 
 
 def _vocab():
+    """Every word in the three papers (cached), used to undo line-break hyphenation."""
     global _VOCAB
     if _VOCAB is None:
         _VOCAB = corpus_vocab("".join(p.get_text() for p in pymupdf.open(ROOT / f"papers/{pid}.pdf"))
@@ -144,6 +148,7 @@ def table_regions(paper: str) -> dict[int, list[dict]]:
             allw = page.get_text("words")
 
             def header_words(top):
+                """Words of the table header region starting at y = top, grouped into lines by height."""
                 words = [w for w in allw
                          if w[0] >= tb[0] - 2 and w[2] <= tb[2] + 2 and w[1] >= top and w[3] <= tb[3] + 2
                          and not (w[1] >= cb[1] - 1 and w[3] <= cb[3] + 1)]          # never the caption
@@ -256,6 +261,7 @@ def build_chunks(words_per_chunk: int, overlap: int = 0, chunker: str = "v1") ->
 
 
 def save(chunks, path: Path):
+    """Write chunks to a .jsonl file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
         for c in chunks:
@@ -267,6 +273,7 @@ def save(chunks, path: Path):
 
 
 def load(path: Path) -> list[Chunk]:
+    """Read chunks from a .jsonl file."""
     return [Chunk(**json.loads(l)) for l in open(path)]
 
 

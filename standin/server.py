@@ -46,20 +46,24 @@ class Bucket:
         self.limit, self.window, self.used, self.t = float(limit), float(window_s), 0.0, time.monotonic()
 
     def _refill(self):
+        """Give back capacity in proportion to time passed (continuous refill, like Groq)."""
         now = time.monotonic()
         self.used = max(0.0, self.used - (now - self.t) * self.limit / self.window)
         self.t = now
 
     def wait_for(self, r: float) -> float:
+        """Seconds until r more units fit."""
         self._refill()
         over = self.used + r - self.limit
         return 0.0 if over <= 0 else over / (self.limit / self.window)
 
     def charge(self, r: float):
+        """Use r units."""
         self._refill()
         self.used += r
 
     def remaining(self):
+        """Units left now."""
         self._refill()
         return max(0, int(self.limit - self.used))
 
@@ -78,10 +82,12 @@ def _load_rewrites() -> dict:
 
 
 class State:
+    """The stand-in's whole state: config, limit buckets, in-flight count, stats, random generator."""
     def __init__(self):
         self.reset()
 
     def reset(self, seed=None):
+        """Default config (calibrated profile, Groq's limits) and empty counters."""
         self.rng = random.Random(seed)
         self.cfg = {
             # latency profile (K §25): "afternoon" (stage 2a) or "evening" (stage 2b, n=20); never pooled
@@ -105,6 +111,7 @@ class State:
         self.rewrites = _load_rewrites()
 
     def _build_buckets(self):
+        """One bucket per (model, limit)."""
         self.buckets = {m: {k: Bucket(self.cfg["limits"][k], LIMIT_NAMES[k][1]) for k in LIMIT_NAMES}
                         for m in MODELS}
 
@@ -115,11 +122,13 @@ app = FastAPI()
 
 def est_tokens(text: str) -> int:
     # ~4 chars/token; real Groq counted 2792-3096 tokens for ~11.2k-char draft prompts
+    """Token estimate, ~4 characters per token (matches Groq's counts on our prompts)."""
     return max(1, len(text) // 4)
 
 
 # ---------------------------------------------------------------- canned content per pipeline step
 def make_reply(messages) -> str:
+    """Canned reply text for the pipeline step the prompt belongs to (understand / draft / check)."""
     system = next((m["content"] for m in messages if m["role"] == "system"), "")
     user = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
     if "route questions" in system:          # step 1 understand
@@ -145,6 +154,7 @@ def make_reply(messages) -> str:
 
 
 def groq_429(model, kind, used, req, wait):
+    """A 429 response shaped exactly like Groq's (same message text and retry-after)."""
     name, _ = LIMIT_NAMES[kind]
     msg = (f"Rate limit reached for model `{model}` in organization `org_STANDIN` service tier `on_demand` "
            f"on {name} ({kind.upper()}): Limit {int(S.cfg['limits'][kind])}, Used {int(used)}, "
@@ -156,6 +166,7 @@ def groq_429(model, kind, used, req, wait):
 
 
 def ratelimit_headers(b):
+    """x-ratelimit-* headers like Groq's, from the stand-in's buckets."""
     return {"x-ratelimit-limit-requests": str(int(b["rpd"].limit)),
             "x-ratelimit-remaining-requests": str(b["rpd"].remaining()),
             "x-ratelimit-reset-requests": f"{(b['rpd'].used) * 86400 / b['rpd'].limit:.1f}s",
@@ -166,6 +177,7 @@ def ratelimit_headers(b):
 
 @app.post("/v1/chat/completions")
 async def chat(req: Request):
+    """POST /v1/chat/completions: limits, injected faults, then a streamed reply with calibrated timing."""
     body = await req.json()
     model = body.get("model")
     if model not in MODELS:
@@ -200,6 +212,7 @@ async def chat(req: Request):
     n_out = min(body.get("max_tokens", 1024), est_tokens(text))
 
     async def stream():
+        """The streamed body: wait in the FIFO, sleep the calibrated first-token time, send chunks."""
         async with S.sem:                        # FIFO above max concurrency (assumed)
             S.inflight += 1
             S.peak_inflight = max(S.peak_inflight, S.inflight)
@@ -245,6 +258,7 @@ async def chat(req: Request):
 
 @app.post("/admin/config")
 async def config(req: Request):
+    """POST /admin/config: change limits, fault rates, profile or seed for a scenario."""
     body = await req.json()
     if "seed" in body:
         S.rng = random.Random(body["seed"])
@@ -270,6 +284,7 @@ async def exhaust(req: Request):
 
 @app.post("/admin/reset")
 async def reset(req: Request):
+    """POST /admin/reset: fresh buckets and stats (optionally a new seed)."""
     body = await req.json() if (await req.body()) else {}
     S.reset(seed=body.get("seed"))
     return {"ok": True}
@@ -277,5 +292,6 @@ async def reset(req: Request):
 
 @app.get("/admin/stats")
 async def stats():
+    """GET /admin/stats: counters, in-flight peak, remaining capacity."""
     return {**S.stats, "inflight": S.inflight, "peak_inflight": S.peak_inflight,
             "remaining": {m: {k: bk.remaining() for k, bk in b.items()} for m, b in S.buckets.items()}}

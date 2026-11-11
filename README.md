@@ -15,9 +15,17 @@ decision, with who made it and the measurement behind it, is in `DECISIONS.md`.
 | Eval (Table 3) | the two above plus 250 / 6 / BM25 order (0.713) | `eval/run_eval.py` default |
 
 The chosen setting sends ~44 % fewer draft tokens than the load setting, so the load results are pessimistic.
-v2 (table caption + header repeated on every table piece, `chunker="v2"`; number-provenance check prompt,
-`Policy.check_prompt="v2"`) is work in progress after the eval (§51–§54); v1 is the measured baseline and no
-v2 row is in `results.csv`.
+
+### Versions after the eval (v1 stays the measured baseline)
+
+| Version | Changes on top of the chosen setting | Where |
+|---|---|---|
+| **v1** | none: the system the tables measure | `SETTINGS["chosen"]`, `Policy()` |
+| **v2** (K §51) | (a) each table's caption + header row repeated on every piece of that table, and the drafter told to quote only the paper text after it; (b) the model check must name the table row / column (or sentence) of every number | `SETTINGS["chosen_v2"]`, `Policy(check_prompt="v2", draft_prompt="v2")` |
+| **v3** (K §64, §66) | v2 + (c) the understand step's paper hint adds that paper's best BM25 piece when it is missing (append, so nothing is lost); (d) a redraft that repeats a claim the model check rejected fails without a second check | `SETTINGS["chosen_v3a"]`, `Policy(..., sticky_check_fail=True)` |
+
+All three use cutoff 0.713 (re-derived for each on the tuning questions: `eval/v1_v2_recall.py`,
+`eval/v3_offline.py`). They are compared on 10 new questions by `eval/run_v1v2.py` (step 12 below).
 
 ## Setup
 
@@ -28,6 +36,19 @@ echo "GROQ_API_KEY=..." > .env                     # only for runs against real 
 ```
 
 Everything that recomputes a table reads files only and makes no network call.
+
+## Ask it a question
+
+```sh
+.venv/bin/python scripts/ask.py "How many attention heads does the base Transformer use?"        # plan: gate score, passages, budget; sends nothing
+.venv/bin/python scripts/ask.py "How many attention heads does the base Transformer use?" --go   # real Groq (chosen setting)
+.venv/bin/python scripts/ask.py "..." --setting chosen_v3a --go                                   # same question on v3
+.venv/bin/python scripts/ask.py "..." --go --base-url http://127.0.0.1:8099/v1                   # on the stand-in (start it first)
+```
+
+Prints the reply (answer / refusal / couldn't verify / busy), its citations, each check's verdict, first-token time
+and tokens; the full event log goes to `raw/ask_<time>.jsonl`. Never touches `results.csv`.
+Stand-in: `.venv/bin/uvicorn standin.server:app --port 8099`.
 
 ## Recompute every table from results.csv
 
@@ -81,6 +102,13 @@ sends nothing) and `--go`; each `--go` was approved by K after its plan.
 10. **Grading by hand, blinded:** `eval/blind_reading.py <run>` -> `raw/blind_reading_<run>.md` + key;
     `eval/apply_grades.py raw/blind_reading_<run>.md --write` joins the grades back through the key.
 11. `scripts/assemble_results.py` (above), then `analysis/tables.py`.
+12. **v1 vs v2 vs v3 on 10 new questions** (K's + 3 marked as Claude Code's, `eval/k_questions_new.csv`, never in
+    the eval/tuning split): `eval/run_v1v2.py --questions eval/k_questions_new.csv --plan` then `--go`; graded
+    blind with steps 10's tools. Offline checks first: `eval/header_split.py`, `eval/v1_v2_recall.py`,
+    `eval/replay_v2_checks.py`, `eval/v3_offline.py`.
+13. **Write-up checks:** `scripts/verify_writeup.py` (every table cell recomputed from results.csv),
+    `scripts/check_numbers.py` (every number in the prose has a source), `sh scripts/render_writeup.sh`
+    (writeup/writeup.pdf; prints the page count of the writing).
 
 ## Layout
 
@@ -93,7 +121,8 @@ sends nothing) and `--go`; each `--go` was approved by K after its plan.
 | `analysis/` | tables and summaries, from raw files only |
 | `probe/` | real-service probe script, findings, raw logs |
 | `raw/` | every run's results, event logs (one JSON line per request with every step), meta files, reading files |
-| `scripts/` | `assemble_results.py`, `relabel_from_events.py`, `redact_org.py`, `check_secrets.sh` |
+| `scripts/` | `ask.py` (one question), `assemble_results.py`, `relabel_from_events.py`, `verify_writeup.py`, `check_numbers.py`, `render_writeup.sh`, `package.sh` (builds the Drive folder), `redact_org.py`, `check_secrets.sh` |
+| `library/` | `fetch_papers.py`: the three PDFs at their pinned versions |
 
 The Groq key lives only in `.env` (not committed, not in the submission). `scripts/redact_org.py` replaced the
 Groq organization id in the raw logs; `scripts/check_secrets.sh` must print "clean" before upload.

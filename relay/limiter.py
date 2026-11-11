@@ -19,6 +19,7 @@ LEARN_DRIFT_S = 600   # K: a learned (lower) limit drifts back to the measured o
 
 
 class _Bucket:
+    """One limit (e.g. 120b tokens per minute) as a continuously refilling bucket, the rule measured on Groq."""
     def __init__(self, limit, window):
         self.base, self.window, self.used, self.t = float(limit), float(window), 0.0, time.monotonic()
         self.learned, self.learned_t = None, None
@@ -37,21 +38,25 @@ class _Bucket:
         return self.learned + (self.base - self.learned) * f
 
     def _refill(self):
+        """Give back capacity in proportion to the time passed (limit per window, continuously)."""
         now = time.monotonic()
         self.used = max(0.0, self.used - (now - self.t) * self.limit / self.window)
         self.t = now
 
     def wait_for(self, r):
+        """Seconds until r more units fit under the limit (0 if they fit now)."""
         self._refill()
         over = self.used + r - self.limit
         return 0.0 if over <= 0 else over / (self.limit / self.window)
 
     def remaining(self):
+        """Units left right now."""
         self._refill()
         return self.limit - self.used
 
 
 class Limiter:
+    """Our copy of Groq's limits for each model: predict waits, reserve capacity, learn from 429s and headers."""
     def __init__(self, models, limits=None):
         self.lock = threading.Lock()
         lim = {**DEFAULT_LIMITS, **(limits or {})}
@@ -105,6 +110,7 @@ class Limiter:
             return w, k, True
 
     def reserve(self, model, tokens_in, tokens_out_est=0):
+        """Count a call against every bucket (used when a call is sent without acquire())."""
         with self.lock:
             bb = self.b[model]
             for k, r in {"rpm": 1, "rpd": 1, "itpm": tokens_in, "tpm": tokens_in + tokens_out_est,
@@ -120,6 +126,7 @@ class Limiter:
                 self.b[model][k].used = max(0.0, self.b[model][k].used + actual_out - est_out)
 
     def sync(self, model, headers):
+        """Tighten our counters from Groq's response headers (never loosen them)."""
         with self.lock:
             bb = self.b[model]
             for hk, k in (("x-ratelimit-remaining-requests", "rpd"), ("x-ratelimit-remaining-tokens", "tpm")):
@@ -132,12 +139,14 @@ class Limiter:
                     bb[k].used = max(bb[k].used, bb[k].limit - rem)   # only ever more conservative
 
     def daily_fraction_left(self, model) -> float:
+        """Share of the day's tokens / requests still free for this model (the 20 % reserve test)."""
         with self.lock:
             bb = self.b[model]
             return min(bb["tpd"].remaining() / bb["tpd"].limit, bb["rpd"].remaining() / bb["rpd"].limit)
 
     # ---- shared retry budget
     def note_request(self, is_retry: bool):
+        """Remember a request (and whether it was a retry) for the shared retry budget."""
         with self.lock:
             now = time.monotonic()
             self.recent.append((now, is_retry))
@@ -145,6 +154,7 @@ class Limiter:
                 self.recent.popleft()
 
     def retry_allowed(self, fraction) -> bool:
+        """True if one more retry keeps retries within the budget share of the last 60 s."""
         with self.lock:
             n = len(self.recent)
             r = sum(1 for _, x in self.recent if x)
