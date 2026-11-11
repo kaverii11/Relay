@@ -228,7 +228,7 @@ class Pipeline:
             ctx.ev("call_start", step=kind, model=model, attempt=attempt, est_in=n_in,
                    limiter_wait_s=round(wait, 3), limiter_binding=binding)     # K §34: limiter wait per call
             r = stream_chat(messages, model, base_url=self.base_url, api_key=self.api_key,
-                            max_tokens=800 if kind == "draft" else 400, timeout_s=timeout,
+                            max_tokens=self._max_tokens(kind), timeout_s=timeout,
                             client=self.http, extra=extra)
             self.lim.sync(model, r.headers)
             self.lim.settle(model, out_est, r.tokens_out)
@@ -442,6 +442,15 @@ class Pipeline:
         ctx.ev("arrival_check", busy=busy, ahead=ahead, rung=level, pred_draft_sent_ms=round(sent_ms, 1),
                binding=binding, mode=self.p.arrival_check)
         return busy, wait, binding
+
+    def _max_tokens(self, kind):
+        """Output cap per call (reasoning tokens count). K §59: the v2 check (number provenance, change b) writes
+        longer replies, so its cap is raised as part of (b); v1 is unchanged (draft 800, short calls 400)."""
+        if kind == "draft":
+            return 800
+        if kind == "check" and self.p.check_prompt == "v2":
+            return self.p.check_max_tokens_v2
+        return 400
 
     def _rungs(self):
         """The ladder (DECISIONS §2): full -> fewer chunks (K §44: the setting's `fewer`, 250/3 BM25 order) ->
