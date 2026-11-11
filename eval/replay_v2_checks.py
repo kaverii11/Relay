@@ -37,6 +37,8 @@ from relay.pipeline import Ctx, Pipeline, est_tokens  # noqa: E402
 from relay.prompts import check_messages  # noqa: E402
 
 GROQ = "https://api.groq.com/openai/v1"
+POST_HOC = ("POST-HOC: the v2 check prompt was written after seeing these failures (K's grades of the eval drafts); "
+            "these counts are not an independent test of it.")
 RUN = "eval_day1_20261111_124523"
 
 
@@ -140,19 +142,22 @@ def main():
         if i + 1 < n:
             time.sleep(a.gap)
     out = ROOT / f"raw/replay_v2_checks_{stamp}.json"
-    out.write_text(json.dumps(res, indent=2, ensure_ascii=False))
+    out.write_text(json.dumps({"label": POST_HOC, "results": res}, indent=2, ensure_ascii=False))
 
     def cnt(rs, g, ok):
         return sum(r["grade"].startswith(g) and r["v2_model_ok"] is ok for r in rs)
     prod = [r for r in res if r["v1_code_ok"] is True]
-    print(f"\n[summary] code-passing drafts (what production's model check sees), n={len(prod)}: wrong caught "
-          f"{cnt(prod, 'wrong', False)}/{sum(r['grade'] == 'wrong' for r in prod)}, correct rejected "
-          f"{cnt(prod, 'correct', False)}/{sum(r['grade'] == 'correct' for r in prod)} (v1 check: 0/6 caught, 0/21 rejected)")
-    allg = [r for r in res if not r["corrupt"]]
-    print(f"  all graded drafts, n={len(allg)}: wrong caught {cnt(allg, 'wrong', False)}/{sum(r['grade'] == 'wrong' for r in allg)}, "
-          f"correct rejected {cnt(allg, 'correct', False)}/{sum(r['grade'] == 'correct' for r in allg)}")
+    nw, nc = sum(r["grade"] == "wrong" for r in prod), sum(r["grade"] == "correct" for r in prod)
     cr = [r for r in res if r["corrupt"]]
-    print(f"  corrupted rejected {sum(not r['v2_model_ok'] for r in cr)}/{len(cr)}")
+    rest = [r for r in res if not r["corrupt"] and r["v1_code_ok"] is False]
+    print(f"\n[report] {POST_HOC}")
+    print(f"  K's three numbers (the drafts production's model check would see = the 27 that passed the code check):")
+    print(f"    wrong drafts caught:            {cnt(prod, 'wrong', False)} of {nw}   (v1 check: 0 of {nw})")
+    print(f"    correct drafts falsely rejected: {cnt(prod, 'correct', False)} of {nc}   (v1 check: 0 of {nc})")
+    print(f"    corrupted drafts rejected:       {sum(not r['v2_model_ok'] for r in cr)} of {len(cr)}")
+    print(f"  extra, the {len(rest)} drafts the code check had already rejected: wrong rejected "
+          f"{cnt(rest, 'wrong', False)} of {sum(r['grade'] == 'wrong' for r in rest)}, correct rejected "
+          f"{cnt(rest, 'correct', False)} of {sum(r['grade'] == 'correct' for r in rest)}")
     print(f"-> {out.relative_to(ROOT)}")
 
 

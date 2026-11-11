@@ -52,12 +52,14 @@ class Retriever:
         if not path.exists():
             save(build_chunks(setting.words, overlap=setting.words // 5, chunker="v2" if v2 else "v1"), path)
         self.chunks = load(path)
-        self.bm = BM25Okapi([_tok(c.text) for c in self.chunks])
+        # K §56 (CC's suggestion, accepted): retrieval and the gate score the piece's BODY only; the v2 table
+        # prefix goes to the drafter and the checker (chunk.text), never into BM25 or the cross-encoder.
+        self.bm = BM25Okapi([_tok(c.body) for c in self.chunks])
 
     def _ce_scores(self, query: str, chunks: list[Chunk]) -> list[float]:
         pairs, owner = [], []
         for i, c in enumerate(chunks):
-            words = c.text.split()
+            words = c.body.split()                 # K §56: body only (= text for v1 pieces)
             for j in range(0, max(1, len(words)), WINDOW_WORDS):
                 pairs.append((query, " ".join(words[j:j + WINDOW_WORDS + 40])))
                 owner.append(i)

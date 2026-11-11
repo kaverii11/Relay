@@ -84,5 +84,6 @@ class Policy:
 
 SETTINGS["chosen"] = SETTINGS["medium_k3_norerank"]
 # v2 (K §51, §53): the chosen setting on the v2 chunker; its cutoff is re-derived on tuning (K's midpoint rule)
-SETTINGS["chosen_v2"] = RetrievalSetting(250, 3, False, gate_threshold=None, fewer_k=3, fewer_rerank=False, chunker="v2")
+SETTINGS["chosen_v2"] = RetrievalSetting(250, 3, False, gate_threshold=0.713, fewer_k=3, fewer_rerank=False, chunker="v2")
+# K §56: with retrieval and the gate on the body only, v2 scores = v1 scores, so the v1 cutoff 0.713 stands.
 CHOSEN = "chosen"          # e.g. eval/e2e.py --setting chosen; loadgen --setting chosen (not used for Tables 2a/2b)
