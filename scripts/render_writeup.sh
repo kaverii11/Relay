@@ -1,12 +1,12 @@
 #!/bin/sh
-# Render writeup/writeup.md to writeup/writeup.pdf: A4, 10 pt, 0.5 in margins (K, 2026-11-12).
+# Render writeup/writeup.md to writeup/writeup.pdf: A4, 9.5 pt, 0.5 in margins (K, 2026-11-12).
 # Needs pandoc and Google Chrome (headless print). Also prints page counts: writing only, and the whole file.
 set -e
 cd "$(dirname "$0")/.."
 T=$(mktemp -d)
 cat > "$T/p.css" <<'CSS'
 @page { size: A4; margin: 0.5in; }
-html, body { font-family: Helvetica, Arial, sans-serif !important; font-size: 10pt !important; line-height: 1.2 !important;
+html, body { font-family: Helvetica, Arial, sans-serif !important; font-size: 9.5pt !important; line-height: 1.2 !important;
              max-width: none !important; padding: 0 !important; margin: 0 !important; }
 h1 { font-size: 14pt !important; } h2 { font-size: 12pt !important; margin: 8px 0 3px !important; } h3 { font-size: 11pt !important; }
 p, li { margin: 3px 0 !important; } blockquote { margin: 4px 16px !important; }

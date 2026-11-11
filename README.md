@@ -25,7 +25,22 @@ The chosen setting sends ~44 % fewer draft tokens than the load setting, so the 
 | **v3** (K §64, §66) | v2 + (c) the understand step's paper hint adds that paper's best BM25 piece when it is missing (append, so nothing is lost); (d) a redraft that repeats a claim the model check rejected fails without a second check | `SETTINGS["chosen_v3a"]`, `Policy(..., sticky_check_fail=True)` |
 
 All three use cutoff 0.713 (re-derived for each on the tuning questions: `eval/v1_v2_recall.py`,
-`eval/v3_offline.py`). They are compared on 10 new questions by `eval/run_v1v2.py` (step 12 below).
+`eval/v3_offline.py`). They are compared on 20 new questions by `eval/run_v1v2.py` (step 12 below).
+
+How v2 and v3 came about (details and dates in DECISIONS §50–§69): after grading the eval, Kaveri chose to fix
+the table failures rather than only report them, under her rules: v1 stays the measured baseline, exactly two
+changes (v2), tested on new questions. Asking the running system her own question ("What learning rate schedule
+does the Transformer use?", `scripts/ask.py`) returned Moshi's Helium schedule as the Transformer's; the two
+causes (the Transformer passage ranked 4th of a 3-piece cut, and a redraft that re-rolled a rejected claim until
+the checker passed it) became v3, kept as a separate arm so v2 vs v1 and v3 vs v2 are each one pair of changes.
+
+**The 20 follow-up questions** (`eval/k_questions_new.csv`, set `new`, never in the eval/tuning split; the
+`author` column names who wrote each): 12 by Kaveri (table questions where the header sits in another piece,
+plain-text questions that name no table or paper, a false premise, and two unanswerable traps) and 8 by Claude Code
+at her request (three header-split questions, one shared-vocabulary question that tests v3's paper hint, and four
+easy baseline facts). Every expected answer was checked against the rendered PDF pages. They were graded blind
+(arms hidden, `eval/blind_reading.py`) by Claude Code at Kaveri's request, an exception to her no-LLM-judge rule
+for the eval (§67), and re-checked by her. Table 3's eval answers (her 20 held-out questions) were graded by her.
 
 ## Setup
 
@@ -102,9 +117,9 @@ sends nothing) and `--go`; each `--go` was approved by K after its plan.
 10. **Grading by hand, blinded:** `eval/blind_reading.py <run>` -> `raw/blind_reading_<run>.md` + key;
     `eval/apply_grades.py raw/blind_reading_<run>.md --write` joins the grades back through the key.
 11. `scripts/assemble_results.py` (above), then `analysis/tables.py`.
-12. **v1 vs v2 vs v3 on 10 new questions** (K's + 3 marked as Claude Code's, `eval/k_questions_new.csv`, never in
-    the eval/tuning split): `eval/run_v1v2.py --questions eval/k_questions_new.csv --plan` then `--go`; graded
-    blind with steps 10's tools. Offline checks first: `eval/header_split.py`, `eval/v1_v2_recall.py`,
+12. **v1 vs v2 vs v3 on 20 new questions** (`eval/k_questions_new.csv`, above): `eval/run_v1v2.py --questions
+    eval/k_questions_new.csv --plan` then `--go` (three arms, rotated per question, ITPM-derived spacing; add
+    `--base-url ... --spaced` to rehearse on the stand-in); graded blind with step 10's tools. Offline checks first: `eval/header_split.py`, `eval/v1_v2_recall.py`,
     `eval/replay_v2_checks.py`, `eval/v3_offline.py`.
 13. **Write-up checks:** `scripts/verify_writeup.py` (every table cell recomputed from results.csv),
     `scripts/check_numbers.py` (every number in the prose has a source), `sh scripts/render_writeup.sh`
