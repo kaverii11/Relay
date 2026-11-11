@@ -40,6 +40,11 @@ def match_key(s: str) -> str:
     return re.sub(r"[\W_]+", "", s)
 
 
+# CC's default, not K's (DECISIONS §48): a quote must keep >= 12 letters/digits after normalising, so "8" or
+# "the" can't count as evidence. Kept for this submission; measured cost in §48.
+MIN_QUOTE_KEY = 12
+
+
 def quote_in(quote: str, passage: str) -> bool:
     q = match_key(quote)
-    return len(q) >= 12 and q in match_key(passage)
+    return len(q) >= MIN_QUOTE_KEY and q in match_key(passage)

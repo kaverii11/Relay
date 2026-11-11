@@ -29,7 +29,7 @@ from relay.limiter import Limiter
 from relay.llm import stream_chat
 from relay.prompts import claim_quotes, check_messages, draft_messages, understand_messages
 from relay.retrieval import Retriever
-from relay.textnorm import match_key, quote_in
+from relay.textnorm import MIN_QUOTE_KEY, match_key, quote_in
 
 DRAFT_OUT_EST = 350      # tokens; real 120b drafts averaged 258 out (stage 2a), padded for safety
 SHORT_OUT_EST = 120      # understand/check; real 20b understand averaged 98 out
@@ -508,6 +508,10 @@ class Pipeline:
                 return False, f"No quote for {cid}."
             for q in qs:
                 if not quote_in(q, use[int(cid[1:]) - 1].chunk.text):
+                    # K §48: name the real reason. Same verdict either way (quote_in unchanged).
+                    if len(match_key(q)) < MIN_QUOTE_KEY:
+                        return False, (f"Quote for {cid} is too short (under {MIN_QUOTE_KEY} letters/digits): "
+                                       f"\"{q[:60]}\"")
                     return False, f"Quote for {cid} is not word-for-word in that passage: \"{q[:60]}\""
         return True, ""
 
