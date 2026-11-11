@@ -43,6 +43,7 @@ RUN = "eval_day1_20261111_124523"
 
 
 def v2_hits(passages, v1_by_text, v2_by_id):
+    """The same passages as v2 pieces (with the table prefix)."""
     out, missing = [], 0
     for p in passages:
         cid = v1_by_text.get(p["text"])
@@ -55,6 +56,7 @@ def v2_hits(passages, v1_by_text, v2_by_id):
 
 
 def entries():
+    """Every eval draft that reached the model check, with its grade, plus corrupted ones."""
     v1 = load(ROOT / "data/chunks_w250.jsonl")
     v2 = {c.id: c for c in load(ROOT / "data/chunks_w250_v2.jsonl")}
     v1_by_text = {c.text: c.id for c in v1}
@@ -92,6 +94,7 @@ def entries():
 
 
 def main():
+    """Plan or run the v2 check on the stored eval drafts (20b only) and report vs the grades."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--plan", action="store_true")
     ap.add_argument("--go", action="store_true")
@@ -145,6 +148,7 @@ def main():
     out.write_text(json.dumps({"label": POST_HOC, "results": res}, indent=2, ensure_ascii=False))
 
     def cnt(rs, g, ok):
+        """How many entries with this grade got this verdict."""
         return sum(r["grade"].startswith(g) and r["v2_model_ok"] is ok for r in rs)
     prod = [r for r in res if r["v1_code_ok"] is True]
     nw, nc = sum(r["grade"] == "wrong" for r in prod), sum(r["grade"] == "correct" for r in prod)

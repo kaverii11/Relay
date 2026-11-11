@@ -37,6 +37,7 @@ _paper_text = None
 
 
 def context(n_chars: int) -> str:
+    """The first n_chars of the Moshi paper's text, as filler context of a chosen size."""
     global _paper_text
     if _paper_text is None:
         d = pymupdf.open(ROOT / "papers/2410.00037v1.pdf")
@@ -45,17 +46,20 @@ def context(n_chars: int) -> str:
 
 
 def msgs(n_chars: int, q="In two sentences, what does this passage describe?"):
+    """A probe prompt with n_chars of passage (sizes chosen to mimic understand / draft calls)."""
     return [{"role": "system", "content": "Answer only from the passage."},
             {"role": "user", "content": f"Passage:\n{context(n_chars)}\n\nQuestion: {q}"}]
 
 
 class Log:
+    """Append-only JSONL log for one probe phase (probe/raw/<phase>_<time>.jsonl)."""
     def __init__(self, phase):
         ts = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
         self.path = ROOT / f"probe/raw/{phase}_{ts}.jsonl"
         self.f = open(self.path, "a")
 
     def write(self, **row):
+        """Write one record (organization id redacted)."""
         row["wall"] = dt.datetime.now(dt.timezone.utc).isoformat()
         # never write the Groq organization id (it appears in 429 bodies)
         self.f.write(re.sub(r"org_[0-9a-z]{20,}", "org_REDACTED", json.dumps(row)) + "\n")
@@ -79,6 +83,7 @@ def _spend_one():
 
 
 def call(log, model, n_chars, max_tokens, tag, client=None, messages=None, extra=None, meta=None):
+    """One counted probe call (against the 300 hard cap); logs timings, tokens, headers, errors."""
     _spend_one()
     t_start = time.time()
     r = stream_chat(messages or msgs(n_chars), model, api_key=KEY, max_tokens=max_tokens,
@@ -108,11 +113,13 @@ def limit_kind(r) -> str:
 
 
 def looks_daily(r) -> bool:
+    """True if a 429 is a per-day limit (those are never retried)."""
     b = (r.error_body or "").lower()
     return r.status == 429 and ("per day" in b or "(rpd)" in b or "(tpd)" in b)
 
 
 def show(r, label=""):
+    """Print one call's status, timings, tokens and remaining-limit headers."""
     h = r.headers
     print(f"{label:>10} {r.status} ttft={r.ttft_ms and round(r.ttft_ms)} total={round(r.total_ms)} "
           f"in={r.tokens_in} out={r.tokens_out} rem_req={h.get('x-ratelimit-remaining-requests')} "
@@ -123,6 +130,7 @@ def show(r, label=""):
 def poll_recovery(log, model, tag, every_s=2.0, max_s=120):
     # Is the quota per model? While `model` is limited, try the other one once.
     # If it succeeds, the fallback model is a separate quota (the biggest capacity lever).
+    """After a 429: poll until the limit admits a call again (time to recover), and try the other model once."""
     other = BIG if model == SMALL else SMALL
     show(call(log, other, 200, 5, tag + "_othermodel"), "other-mdl")
     t0 = time.time()
@@ -139,6 +147,7 @@ def poll_recovery(log, model, tag, every_s=2.0, max_s=120):
 
 
 def phase_latency(args):
+    """Unloaded latency: n calls per model at understand-sized and draft-sized prompts."""
     log = Log("latency")
     # (model, prompt_chars, max_tokens, n). ~4 chars/token: 600ch~150tok (understand), 10k~2.5k tok (draft)
     plan = [(SMALL, 600, 60, args.n), (SMALL, 10000, 250, args.n),
@@ -155,6 +164,7 @@ def phase_latency(args):
 
 
 def phase_rpm(args):
+    """Requests per minute: tiny calls in parallel until the first 429, then time the recovery."""
     log = Log("rpm")
     model = args.model
     first429 = None
@@ -173,6 +183,7 @@ def phase_rpm(args):
 
 
 def phase_tpm(args):
+    """Tokens per minute: calls of --chars prompt size back to back until a token 429."""
     log = Log("tpm")
     model = args.model
     got429 = False
@@ -190,6 +201,7 @@ def phase_tpm(args):
 
 
 def phase_inflight(args):
+    """Requests in flight: 1 / 4 / 8 / 16 tiny calls at once; does latency rise, is anything rejected?"""
     log = Log("inflight")
     for k in args.levels:
         with cf.ThreadPoolExecutor(k) as ex:
@@ -313,6 +325,7 @@ def phase_tpd(args):
 
 
 def phase_models(args):
+    """List the models the account can use, with context windows."""
     r = httpx.get(f"{GROQ_BASE}/models", headers={"Authorization": f"Bearer {KEY}"}, timeout=15)
     print(r.status_code)
     for m in sorted(r.json().get("data", []), key=lambda m: m["id"]):

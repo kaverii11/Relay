@@ -36,10 +36,12 @@ def norm_paper(s):
 
 
 def key(r):
+    """Stratum of a question: (paper, type, answerable)."""
     return (norm_paper(r["paper"]), r["type"].strip(), r["answerable"].strip().lower())
 
 
 def split(rows, n_eval, seed):
+    """Seeded, stratified choice of the eval questions (largest-remainder quotas)."""
     rng = random.Random(seed)
     tie = {r["id"]: rng.random() for r in sorted(rows, key=lambda r: r["id"])}
     order = sorted(rows, key=lambda r: (r["answerable"].strip().lower(), r["type"].strip(),
@@ -50,6 +52,7 @@ def split(rows, n_eval, seed):
 
 
 def table(rows, ev, field, f):
+    """Print eval vs tuning counts for one field."""
     c_e = Counter(f(r) for r in rows if r["id"] in ev)
     c_t = Counter(f(r) for r in rows if r["id"] not in ev)
     ne, nt = sum(c_e.values()), sum(c_t.values())
@@ -59,6 +62,7 @@ def table(rows, ev, field, f):
 
 
 def main():
+    """Split the question file into eval and tuning (refuses to overwrite without --force)."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--seed", type=int, required=True)
     ap.add_argument("--n-eval", type=int, default=20)

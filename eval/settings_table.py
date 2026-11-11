@@ -40,6 +40,7 @@ KS = (2, 3, 4, 6, 8)
 
 
 def main():
+    """Recall and cost per retrieval setting on the tuning questions (offline)."""
     rw = load_rewrites()
     cross_encoder()
     rows = [p for p in load_pool() if p["set"] == "tuning" and p["meta"].get("paper", "").strip()
@@ -78,6 +79,7 @@ def main():
                 rec, toks, ms = [], [], []
                 for p, groups, d in per_q:
                     def gate(x):
+                        """Gate score of one question under this setting."""
                         return x["gate20"] if rr else max(h.ce for h in x["bm"][:k])
                     win = max(d, key=lambda qk: gate(d[qk]))
                     sent = (d[win]["ce"] if rr else d[win]["bm"])[:k]

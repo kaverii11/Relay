@@ -44,10 +44,12 @@ EST_IN, EST_OUT = 415, 105
 
 
 def lower_first(q):
+    """Lower-case the first letter (for wording probes), unless it starts an acronym."""
     return q[0].lower() + q[1:] if q and not q[:2].isupper() else q
 
 
 def items(pool, n_probe, seed, sets=("eval", "tuning")):
+    """What to rewrite: every question, plus seeded wording probes from tuning questions."""
     if any(not p["set"] for p in pool):
         sys.exit("set is blank: run eval/split.py first (K). Wording probes are drawn from TUNING questions only.")
     out = [{"id": p["id"], "kind": "k", "set": p["set"], "type": p.get("type", ""), "answerable": p["ans"], "q": p["q"]}
@@ -61,6 +63,7 @@ def items(pool, n_probe, seed, sets=("eval", "tuning")):
 
 
 def main():
+    """Plan or run the real 20b understand step on every question; store the outputs."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--plan", action="store_true")
     ap.add_argument("--go", action="store_true")

@@ -27,6 +27,7 @@ from relay.textnorm import match_key  # noqa: E402
 
 
 def main():
+    """Gate score of every tuning question with its refuse / pass label, and the errors at each candidate cutoff."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--include-eval", action="store_true")
     ap.add_argument("--setting", default="medium_rerank")
@@ -42,6 +43,7 @@ def main():
 
     rows = []
     def visible(set_):                     # eval held out; blank set (not split yet) never shown
+        """Tuning rows only (eval rows only with --include-eval)."""
         return set_ == "tuning" or (a.include_eval and set_ == "eval")
     for rec in rw.values():
         # the CURRENT set from k_questions.csv (a rewrite may have been stored before the split)

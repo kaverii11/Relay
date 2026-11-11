@@ -14,10 +14,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def rows(pattern):
+    """Every record of the probe logs matching a file pattern."""
     return [json.loads(l) for f in sorted(glob.glob(str(ROOT / "probe/raw" / pattern))) for l in open(f)]
 
 
 def ok(rs):
+    """Only successful calls that produced a first token."""
     return [r for r in rs if r["status"] == 200 and r.get("ttft_ms")]
 
 
@@ -32,24 +34,29 @@ inflight = ok(rows("inflight_*.jsonl"))
 
 
 def load(files):
+    """Short and draft-sized calls from a set of spread-phase files."""
     rs = ok([json.loads(l) for f in files for l in open(ROOT / "probe/raw" / f)])
     return [r for r in rs if r["tag"] == "spread_short"], [r for r in rs if r["tag"] == "spread_draft"]
 
 
 def by_model(rs, m):
     # exact id: "gpt-oss-120b".endswith("20b") is True, which silently mixed the models
+    """Calls of one model (exact id match)."""
     return [r for r in rs if r["model"] == f"openai/gpt-oss-{m}"]
 
 
 def uncached(rs):
+    """Calls with no prompt-cache hit (a cache hit halves first-token time)."""
     return [r for r in rs if not r.get("cached_tokens")]
 
 
 def med(rs, k="ttft_ms"):
+    """Median of a field."""
     return float(np.median([r[k] for r in rs]))
 
 
 def wilson(k, n, z=1.96):
+    """95 % Wilson interval for k of n (e.g. the slow-call rate)."""
     p = k / n
     c = (p + z * z / (2 * n)) / (1 + z * z / n)
     h = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)

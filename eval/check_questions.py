@@ -57,6 +57,7 @@ MIN_KEY = 4                # shorter normalised strings (e.g. "0.1" -> "01") mat
 
 
 def pages_text():
+    """Each paper's pages as match keys, to look facts up."""
     out = {}
     for v in PAPER_VERSIONS:
         doc = fitz.open(ROOT / f"papers/{v}.pdf")
@@ -65,6 +66,7 @@ def pages_text():
 
 
 def resolve_paper(s):
+    """A paper name or id as written in the question file -> its pinned version id."""
     s = s.strip().removesuffix(".pdf")
     hits = [v for v in PAPER_VERSIONS if v == s or v.split("v")[0] == s]
     return hits[0] if hits else None
@@ -78,6 +80,7 @@ def section_number(s):
 
 
 def parse_pages(s):
+    """'7' or '11-12' -> the page range."""
     m = re.fullmatch(r"\s*(\d+)\s*(?:[-–]\s*(\d+))?\s*", s or "")
     if not m:
         return None
@@ -142,6 +145,7 @@ def citations(r, txt, sections, E, W):
 
 
 def main(path: Path):
+    """Check the question file: columns, values, and that each must_include fact is on the cited page."""
     rows = list(csv.DictReader(open(path, newline="", encoding="utf-8-sig")))
     errs, warns = [], []
     cols = list(rows[0].keys()) if rows else []

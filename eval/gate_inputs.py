@@ -36,6 +36,7 @@ def rule(rows, inp):
 
 
 def main():
+    """Gate input compared: raw question vs 20b rewrite vs the max of both."""
     pool = {p["id"]: p for p in load_pool()}
     rw = load_rewrites()
     ret = Retriever(SETTINGS["medium_rerank"])

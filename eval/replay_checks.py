@@ -38,6 +38,7 @@ CHECK_OUT = 100
 
 
 def build(events_path: Path):
+    """Stored drafts from an e2e run's events (plus K's corrupted ones) as replay entries."""
     old = json.loads(DRAFTS.read_text()) if DRAFTS.exists() else []
     keep = [e for e in old if e.get("corrupt")]
     out = []
@@ -62,10 +63,12 @@ def build(events_path: Path):
 
 
 def hits_of(entry):
+    """Passages of a stored entry in the shape the checker expects."""
     return [SimpleNamespace(chunk=SimpleNamespace(text=p["text"], cite=lambda c=p["cite"]: c)) for p in entry["passages"]]
 
 
 def main():
+    """Plan or run the checker on stored drafts (20b only) and report verdicts."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--build", action="store_true")
     ap.add_argument("--events", type=Path, default=None, help="default: latest raw/events_e2e_evening_*.jsonl")
