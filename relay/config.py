@@ -18,6 +18,7 @@ class RetrievalSetting:
     # None = half the pieces (min 2) in this setting's own order. K (2026-11-11 §44): 250/3 in BM25 order.
     fewer_k: int | None = None
     fewer_rerank: bool | None = None
+    chunker: str = "v1"   # "v2" (K §51): table caption + header repeated on every table piece; rows tagged _v2
 
     def cutoff(self, policy) -> float:
         return self.gate_threshold if self.gate_threshold is not None else policy.gate_threshold
@@ -30,7 +31,7 @@ class RetrievalSetting:
 
     @property
     def name(self):
-        return f"w{self.words}_k{self.k}_rr{int(self.rerank)}"
+        return f"w{self.words}_k{self.k}_rr{int(self.rerank)}" + ("_v2" if self.chunker == "v2" else "")
 
 
 # K (2026-11-11 §44), from the offline recall table and her midpoint rule (raw/settings_table_*, raw/cutoffs_by_size_*):
@@ -39,6 +40,9 @@ SETTINGS = {
     "medium_rerank": RetrievalSetting(250, 6, True, gate_threshold=0.875, fewer_k=3, fewer_rerank=False),      # baseline
     "medium_norerank": RetrievalSetting(250, 6, False, gate_threshold=0.713, fewer_k=3, fewer_rerank=False),
     "medium_k3_norerank": RetrievalSetting(250, 3, False, gate_threshold=0.713, fewer_k=3, fewer_rerank=False),
+    # K §50 / §52: the CHOSEN setting, by name (same object as medium_k3_norerank, so rows carry w250_k3_rr0).
+    # Load scenarios keep medium_rerank (load/loadgen.py default) so Tables 2a/2b reproduce as measured.
+    "chosen": None,
     # earlier candidates, kept for the offline tables only (not run on Groq)
     "small_pieces": RetrievalSetting(120, 8, False),
     "large_rerank": RetrievalSetting(500, 3, True),
@@ -63,6 +67,7 @@ class Policy:
     # --- check (DECISIONS §8, PENDING K): "both" | "code_only" | "adaptive"
     check_mode: str = "both"
     check_effort: str = "low"              # K §15: test "medium" later
+    check_prompt: str = "v1"               # "v2" (K §51 b): name each number's table row/column or sentence
     # --- degradation + budget (DECISIONS §2, §4)
     daily_reserve_fraction: float = 0.20   # PLACEHOLDER: K wants burst-sized reserve after the burst scenario
     workers: int = 16                      # our own concurrency; arrivals beyond this queue
@@ -75,3 +80,9 @@ class Policy:
 
     def as_dict(self):
         return asdict(self)
+
+
+SETTINGS["chosen"] = SETTINGS["medium_k3_norerank"]
+# v2 (K §51, §53): the chosen setting on the v2 chunker; its cutoff is re-derived on tuning (K's midpoint rule)
+SETTINGS["chosen_v2"] = RetrievalSetting(250, 3, False, gate_threshold=None, fewer_k=3, fewer_rerank=False, chunker="v2")
+CHOSEN = "chosen"          # e.g. eval/e2e.py --setting chosen; loadgen --setting chosen (not used for Tables 2a/2b)

@@ -35,6 +35,13 @@ class Chunk:
     page_end: int
     text: str
     tables: list = None   # v2 (K §51): table numbers whose caption + header row were repeated at the start
+    prefix: str = None    # v2: the repeated text itself (text = prefix + " " + body); NOT evidence (K §53)
+
+    @property
+    def body(self) -> str:
+        """The paper's own text of this piece, without the v2 repeated prefix. The code check quotes against
+        this, so a claim can't pass on repeated text alone (K §53)."""
+        return self.text[len(self.prefix) + 1:] if self.prefix else self.text
 
     def cite(self) -> str:
         pg = f"p.{self.page_start}" if self.page_start == self.page_end else f"pp.{self.page_start}-{self.page_end}"
@@ -134,15 +141,23 @@ def table_regions(paper: str) -> dict[int, list[dict]]:
             used_t.add(ti)
             used_c.add(ci)
             tb, cb = tabs[ti], caps[ci]
-            words = [w for w in page.get_text("words")
-                     if w[0] >= tb[0] - 2 and w[2] <= tb[2] + 2 and w[1] >= tb[1] - 2 and w[3] <= tb[3] + 2]
-            lines = {}
-            for w in words:
-                lines.setdefault(round(w[1] / 3), []).append(w)
-            hw = []
-            for _, ws in sorted(lines.items())[:4]:
-                if sum(bool(_NUMERIC.search(w[4])) for w in ws) / len(ws) < 0.5:
-                    hw += ws
+            allw = page.get_text("words")
+
+            def header_words(top):
+                words = [w for w in allw
+                         if w[0] >= tb[0] - 2 and w[2] <= tb[2] + 2 and w[1] >= top and w[3] <= tb[3] + 2
+                         and not (w[1] >= cb[1] - 1 and w[3] <= cb[3] + 1)]          # never the caption
+                lines = {}
+                for w in words:
+                    lines.setdefault(round(w[1] / 3), []).append(w)
+                hw = []
+                for _, ws in sorted(lines.items())[:4]:
+                    if sum(bool(_NUMERIC.search(w[4])) for w in ws) / len(ws) < 0.5:
+                        hw += ws
+                return hw
+            hw = header_words(tb[1] - 2)
+            if sum(ch.isalpha() for w in hw for ch in w[4]) < 6:   # header drawn above the table's top rule
+                hw = header_words(tb[1] - 25)
             # one cell per column: words that overlap in x (stacked header lines) or sit within 4 pt on a line
             cols = []
             for w in sorted(hw, key=lambda w: w[0]):
@@ -193,6 +208,12 @@ def page_blocks(paper: str, regions: dict | None = None):
             yield item if regions is None else item + (_in_table(regions, pno, x0, y0, x1, y1),)
 
 
+def _first_sentence(caption: str) -> str:
+    """K §53: the caption in the prefix is cut to its first sentence ("Table N: ... ."); header rows stay whole."""
+    m = re.match(r"(Table \d+\s*[:.|].*?[.!?])(\s|$)", caption)
+    return m.group(1) if m else caption
+
+
 def build_chunks(words_per_chunk: int, overlap: int = 0, chunker: str = "v1") -> list[Chunk]:
     """v1: word windows within a section. v2 (K §51): the SAME windows, and every window that holds part of
     a table starts with that table's caption and header row (K's rule as stated: every such window, even one
@@ -222,11 +243,13 @@ def build_chunks(words_per_chunk: int, overlap: int = 0, chunker: str = "v1") ->
                 for tn in dict.fromkeys(t for _, _, t in win if t is not None):
                     t = tinfo[tn]
                     tabs.append(tn)
-                    prefix.append(f"[Table {tn}, repeated: {t['caption']} | Header: {t['header'] or '(none found)'}]")
+                    prefix.append(f"[Table {tn}, repeated: {_first_sentence(t['caption'])} | "
+                                  f"Header: {t['header'] or '(none found)'}]")
+                pre = " ".join(prefix) or None
                 chunks.append(Chunk(
                     id=f"{paper}:{len(chunks)}", paper=paper, title=title, section=sec,
                     page_start=win[0][1], page_end=win[-1][1],
-                    text=" ".join(prefix + [body]), tables=tabs or None))
+                    text=" ".join(prefix + [body]), tables=tabs or None, prefix=pre))
                 if i + words_per_chunk >= len(words):
                     break
     return chunks
@@ -237,8 +260,9 @@ def save(chunks, path: Path):
     with open(path, "w") as f:
         for c in chunks:
             d = asdict(c)
-            if d.get("tables") is None:
-                d.pop("tables", None)          # v1 files stay byte-identical
+            for k in ("tables", "prefix"):
+                if d.get(k) is None:
+                    d.pop(k, None)             # v1 files stay byte-identical
             f.write(json.dumps(d) + "\n")
 
 

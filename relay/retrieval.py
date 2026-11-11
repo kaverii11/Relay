@@ -47,9 +47,10 @@ class Hit:
 class Retriever:
     def __init__(self, setting: RetrievalSetting):
         self.s = setting
-        path = ROOT / f"data/chunks_w{setting.words}.jsonl"
+        v2 = getattr(setting, "chunker", "v1") == "v2"
+        path = ROOT / f"data/chunks_w{setting.words}{'_v2' if v2 else ''}.jsonl"
         if not path.exists():
-            save(build_chunks(setting.words, overlap=setting.words // 5), path)
+            save(build_chunks(setting.words, overlap=setting.words // 5, chunker="v2" if v2 else "v1"), path)
         self.chunks = load(path)
         self.bm = BM25Okapi([_tok(c.text) for c in self.chunks])
 

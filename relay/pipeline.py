@@ -507,7 +507,7 @@ class Pipeline:
             if not qs:
                 return False, f"No quote for {cid}."
             for q in qs:
-                if not quote_in(q, use[int(cid[1:]) - 1].chunk.text):
+                if not quote_in(q, use[int(cid[1:]) - 1].chunk.body):   # K §53: never the v2 repeated prefix
                     # K §48: name the real reason. Same verdict either way (quote_in unchanged).
                     if len(match_key(q)) < MIN_QUOTE_KEY:
                         return False, (f"Quote for {cid} is too short (under {MIN_QUOTE_KEY} letters/digits): "
@@ -516,9 +516,12 @@ class Pipeline:
         return True, ""
 
     def _model_check(self, ctx, d, use):
-        r = self.call_model(ctx, SMALL, check_messages(ctx.question, d["answer"], d["claims"], use), "check",
+        r = self.call_model(ctx, SMALL, check_messages(ctx.question, d["answer"], d["claims"], use,
+                                                       variant=self.p.check_prompt), "check",
                             effort=self.p.check_effort)
         j = parse_json(r.text) or {}
+        if "numbers" in j:
+            ctx.ev("check_numbers", numbers=j.get("numbers"))   # v2: where the checker says each number is shown
         if j.get("supported") is True:
             return True, ""
         return False, "; ".join(j.get("problems") or ["checker did not confirm support"])

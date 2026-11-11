@@ -51,6 +51,19 @@ supported if the passage contradicts it or does not contain it (the question's o
 Return ONLY JSON: {"supported": true|false, "problems": ["short reason", ...]}"""
 
 
+# v2 (K §51 b): the same check, plus number provenance. Selected by Policy.check_prompt = "v2"; v1 above is unchanged.
+CHECK_SYSTEM_V2 = """You verify a drafted answer against the cited passages. The quotes show where in each passage the
+drafter looked; judge each claim against the WHOLE cited passage, not only the quote. A claim is supported when
+the passage states it, including that any number is for the right system, setting and table row. A claim is NOT
+supported if the passage contradicts it or does not contain it (the question's own wording is not evidence).
+For EVERY number in the answer, name where the cited passage shows it: for a table, the table, the row and the
+column (use the table's header row, which may be repeated at the start of the passage in [Table N, repeated:
+...]); for prose, the sentence. If the passage does not show which row and column (or which sentence) the number
+comes from, or shows it under a different row or column than the answer says, the claim is NOT supported.
+Return ONLY JSON: {"numbers": [{"value": "...", "where": "Table N, row ..., column ..." or "sentence: ..."}],
+"supported": true|false, "problems": ["short reason", ...]}"""
+
+
 def claim_quotes(c) -> list[str]:
     """A claim's quotes: "quotes": [...] (current drafter) or the older single "quote"."""
     qs = c.get("quotes")
@@ -59,12 +72,13 @@ def claim_quotes(c) -> list[str]:
     return [q for q in (qs if isinstance(qs, list) else [qs]) if isinstance(q, str) and q.strip()]
 
 
-def check_messages(question: str, answer: str, claims, hits):
-    """K (2026-11-10, §37): the checker sees the whole text of every CITED passage, plus the quotes."""
+def check_messages(question: str, answer: str, claims, hits, variant: str = "v1"):
+    """K (2026-11-10, §37): the checker sees the whole text of every CITED passage, plus the quotes.
+    variant "v2" (K §51 b): the number-provenance prompt; the user message is the same."""
     cited = sorted({str(c.get("chunk", "")) for c in claims}, key=lambda s: int(s[1:]) if s[1:].isdigit() else 0)
     passages = "\n\n".join(f"[{cid}] {hits[int(cid[1:]) - 1].chunk.text}" for cid in cited
                            if cid[1:].isdigit() and 1 <= int(cid[1:]) <= len(hits))
     lines = "\n".join(f"- {c.get('chunk')}: " + " | ".join(f"\"{q}\"" for q in claim_quotes(c)) for c in claims)
-    return [{"role": "system", "content": CHECK_SYSTEM},
+    return [{"role": "system", "content": CHECK_SYSTEM_V2 if variant == "v2" else CHECK_SYSTEM},
             {"role": "user", "content": f"Question: {question}\n\nAnswer: {answer}\n\nCited passages:\n{passages}\n\n"
                                         f"Quotes:\n{lines}"}]
