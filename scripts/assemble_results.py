@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT))
 from relay.service import COLUMNS  # noqa: E402
 
 def main(paths, out=ROOT / "results.csv"):
+    """Concatenate per-run result files into results.csv."""
     rows = []
     for p in paths:
         rows += list(csv.DictReader(open(p)))

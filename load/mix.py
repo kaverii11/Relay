@@ -38,6 +38,7 @@ MIX_PATH = ROOT / "load/mix.json"
 
 
 def load_pool(path: Path | None = None):
+    """Questions from a CSV: id, set, question, answerable, and every other column under meta."""
     path = path or POOL_PATH
     rows = list(csv.DictReader(open(path, newline="", encoding="utf-8-sig")))
     need = {"id", "set", "question", "answerable"}
@@ -53,6 +54,7 @@ def load_pool(path: Path | None = None):
 
 
 def load_variants(path: Path | None = None, parents=None):
+    """Assistant-written rewordings of K's questions (load pool only, never eval or tuning)."""
     path = path or VARIANTS_PATH
     if not path.exists():
         return []
@@ -105,6 +107,7 @@ class Sampler:
         self.forced_repeats, self.used_once = 0, set()
 
     def fresh(self):
+        """Next question from the shuffled deck (answerable or not, at the configured share)."""
         ans = self.rng.random() >= self.x
         if not self.left[ans]:
             self.left[ans] = self.decks[ans][:]
@@ -116,15 +119,18 @@ class Sampler:
         return p
 
     def hot_set(self, hot: int):
+        """A few questions that a burst repeats."""
         return [self.fresh() for _ in range(hot)]
 
     def burst(self, hot_set: list, repeat_share: float):
+        """A burst question: a repeat from the hot set at the configured share, else a fresh one."""
         if hot_set and self.rng.random() < repeat_share:
             return self.rng.choice(hot_set), True
         return self.fresh(), False
 
 
 def _rel(p: Path) -> str:
+    """Path relative to the repo, for printing."""
     try:
         return str(p.relative_to(ROOT))
     except ValueError:
@@ -143,6 +149,7 @@ def stand_in_query(p, rewrites):
 
 
 def load_rewrites():
+    """The stored real 20b rewrites (search query + paper hint) of every question."""
     return json.loads(REWRITES_PATH.read_text()) if REWRITES_PATH.exists() else {}
 
 
@@ -170,6 +177,7 @@ def _scores(pool):
 
 
 def main():
+    """Print the load mix: refusal share, repeats, and how many questions reach the draft."""
     import argparse
     from relay.config import Policy
     ap = argparse.ArgumentParser()
@@ -209,6 +217,7 @@ def main():
         return
 
     def share(items):
+        """Share of questions whose gate score clears the cutoff."""
         return sum(sc[p["id"]] >= cut for p in items) / max(1, len(items))
     groups = {g: [p for p in pool if (p["set"] == "variant") == (g == "variant")] for g in ("k", "variant")}
     out = {name: {

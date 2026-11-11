@@ -43,6 +43,7 @@ def stored(p, rw):
 
 
 def part_b(L):
+    """Change B on the tuning questions: hint accuracy, recall per arm, cutoff per arm."""
     pool = {p["id"]: p for p in load_pool()}
     rw = load_rewrites()
     cross_encoder()
@@ -121,6 +122,7 @@ def part_b(L):
 
 
 def part_a(L):
+    """Change A on every stored real run: how often a redraft repeated a rejected claim."""
     L += ["", "## A. Sticky check failure, replayed on every stored real run (drafts + both verdicts logged)", ""]
     files = sorted((ROOT / "raw").glob("events_e2e_*.jsonl")) + sorted((ROOT / "raw").glob("events_eval_day*.jsonl")) \
         + sorted((ROOT / "raw").glob("ask_*.jsonl"))
@@ -153,6 +155,7 @@ def part_a(L):
 
 
 def main():
+    """Run both parts and write raw/v3_offline_<time>.md."""
     L = [f"# v3 offline ({dt.datetime.now().isoformat(timespec='minutes')}); no Groq", ""]
     L = part_b(L)
     L = part_a(L)

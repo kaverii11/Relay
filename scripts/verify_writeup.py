@@ -29,6 +29,7 @@ SET = {"w250_k6_rr1": "250/6 re-rank", "w250_k6_rr0": "250/6 BM25", "w250_k3_rr0
 
 
 def label(r):
+    """The write-up's row label (scenario, profile) for a results.csv row."""
     sc = {"minute_limit_halved": "per-minute limit halved", "daily_exhausted": "daily budget exhausted",
           "overload": "sustained overload"}.get(r["scenario"], r["scenario"])
     v = r.get("run_variant") or ""
@@ -45,6 +46,7 @@ def label(r):
 
 
 def table_rows(md, title):
+    """The cells of the Markdown table under a heading."""
     seg = md[md.index(title):]
     seg = seg[seg.index("\n|"):]
     rows = []
@@ -56,9 +58,11 @@ def table_rows(md, title):
 
 
 def main():
+    """Recompute every cell of Tables 2a, 2b and 3 from results.csv and list mismatches."""
     bad, n_cells = [], 0
 
     def cmp(where, got, want):
+        """Compare one cell with its recomputed value; remember any mismatch."""
         nonlocal n_cells
         n_cells += 1
         if got.replace("**", "").strip() != want.strip():

@@ -57,10 +57,12 @@ CHECK_IN, CHECK_OUT = 700, 120   # new checker (whole passage, K §37): replay i
 
 
 def _pass_cands(pool):
+    """Tuning questions K marked gate_expected = pass."""
     return [p for p in pool if p["set"] == "tuning" and p["meta"].get("gate_expected", "").lower() == "pass"]
 
 
 def pick(pool, n, seed):
+    """n seeded questions, answerable and not in proportion."""
     cands = _pass_cands(pool)
     rng = random.Random(seed)
     yes = [p for p in cands if p["ans"]]
@@ -85,6 +87,7 @@ def add_extra(qs, pool, n_extra, seed, ret, rw, cut):
 
 
 def by_ids(pool, ids):
+    """Exactly these question ids (to replay a set)."""
     want = [x.strip() for x in ids.split(",") if x.strip()]
     have = {p["id"]: p for p in pool}
     missing = [x for x in want if x not in have]
@@ -94,6 +97,7 @@ def by_ids(pool, ids):
 
 
 def last_event_line(path: Path):
+    """The last record written to an event log."""
     with open(path) as f:
         return json.loads(f.readlines()[-1])
 
@@ -136,11 +140,13 @@ def answer_md(p, rec, pred):
 
 
 def pct(xs, q):
+    """Nearest-rank percentile."""
     xs = sorted(xs)
     return xs[min(len(xs) - 1, max(0, int(round(q * len(xs) + 0.5)) - 1))] if xs else None
 
 
 def main():
+    """Plan (or run, with --go) the end-to-end set on real Groq, one question at a time."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--plan", action="store_true")
     ap.add_argument("--go", action="store_true")

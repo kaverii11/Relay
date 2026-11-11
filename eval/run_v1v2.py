@@ -50,6 +50,7 @@ ARMS = {"chosen": Policy,                                                       
 
 
 def load_new(path):
+    """Read the new-questions CSV; refuse ids that clash with the eval/tuning file."""
     rows = list(csv.DictReader(open(path, newline="", encoding="utf-8-sig")))
     if not rows:
         raise SystemExit(f"{path}: empty")
@@ -66,6 +67,7 @@ def load_new(path):
 
 
 def main():
+    """Plan (or run, with --go) v1 / v2 / v3 on the new questions; write results, events, reading file, meta."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--questions", required=True)
     ap.add_argument("--plan", action="store_true")
@@ -75,6 +77,8 @@ def main():
     ap.add_argument("--patience", type=float, default=60.0)
     ap.add_argument("--min-gap", type=float, default=10.0)
     ap.add_argument("--base-url", default=None)
+    ap.add_argument("--spaced", action="store_true", help="stand-in only: keep the real run's spacing between runs "
+                    "(without it a stand-in run fires back to back, so the limiter turns most of it away as busy)")
     a = ap.parse_args()
     real = a.base_url is None
     qs = load_new(a.questions)
@@ -107,6 +111,7 @@ def main():
     wq[SMALL] += sum(2 * ((check_in[nm] - CHECK_IN) + (check_out[nm] - CHECK_OUT)) for nm in names)
 
     def price(r):
+        """Expected requests and tokens per model for the whole run at redraft rate r."""
         n = len(ids)
         s_tok = sum(n * ((UNDERSTAND_IN + UNDERSTAND_OUT) + (1 + r) * (check_in[nm] + check_out[nm])) for nm in names)
         b_tok = sum(n * (1 + r) * (draft_in[nm] + DRAFT_OUT) for nm in names)
@@ -179,7 +184,7 @@ def main():
             if budget is not None and budget.stopped:
                 stopped = budget.stopped
                 break
-            if i < n_runs and real:
+            if i < n_runs and (real or a.spaced):       # ITPM-derived spacing between runs (see gap_seconds)
                 time.sleep(gaps[nm])
         if stopped:
             print(f"  STOP: {stopped}")

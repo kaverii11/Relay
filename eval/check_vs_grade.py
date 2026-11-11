@@ -33,6 +33,7 @@ from relay.config import SETTINGS  # noqa: E402
 
 
 def main():
+    """Code-only vs code + model check against K's grades (what each check let through)."""
     run = sys.argv[1]
     meta = json.loads((ROOT / f"raw/meta_{run}.json").read_text())
     name_of = {SETTINGS[n].name: n for n in meta["settings"]}

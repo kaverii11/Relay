@@ -27,6 +27,7 @@ sys.path.insert(0, str(ROOT))
 
 
 def load_run(run):
+    """Every question x setting record of a run, from its event logs."""
     meta = json.loads((ROOT / f"raw/meta_{run}.json").read_text())
     recs = []
     for nm in meta["settings"]:
@@ -37,6 +38,7 @@ def load_run(run):
 
 
 def block(bid, qid, d, question):
+    """One entry of the blinded file: the reply and checks, with anything that names the setting removed."""
     res, ev = d["result"], d["events"]
     checks = {c["round"]: c for c in ev if c["ev"] == "check"}
     drafts = [e for e in ev if e["ev"] == "draft_out"]
@@ -67,6 +69,7 @@ def block(bid, qid, d, question):
 
 
 def main():
+    """Write the shuffled blinded file (what K grades) and its key (B## -> question + setting)."""
     run = sys.argv[1]
     seed = int(sys.argv[sys.argv.index("--seed") + 1]) if "--seed" in sys.argv else 7
     out_md, out_key = ROOT / f"raw/blind_reading_{run}.md", ROOT / f"raw/blind_key_{run}.json"

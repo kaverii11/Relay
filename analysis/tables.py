@@ -44,11 +44,13 @@ PRICES = {"120b": {"in": 0.15, "out": 0.60}, "20b": {"in": 0.075, "out": 0.30}}
 
 
 def paid_cost(rs):
+    """What these rows would cost at Groq's paid on-demand prices (USD)."""
     return sum(int(r[f"tokens_in_{m}"]) * PRICES[m]["in"] + int(r[f"tokens_out_{m}"]) * PRICES[m]["out"]
                for r in rs for m in PRICES) / 1e6
 
 
 def f(x):
+    """CSV cell -> float, or None when empty."""
     return None if x in ("", None) else float(x)
 
 
@@ -64,6 +66,7 @@ def pct_linear(sorted_vals, p):
 
 
 def pcts(vals, ps=(50, 95, 99)):
+    """'p50 / p95 / p99 (n=...)' of the values (linear interpolation; no-token rows count as infinite), dagger on p99 when n < 100."""
     a = sorted(INF if v is None else v for v in vals)
     n = len(a)
     if not n:
@@ -79,6 +82,7 @@ def pcts(vals, ps=(50, 95, 99)):
 
 
 def peak_queue(rows):
+    """Most requests waiting at one instant (arrived, first model call not yet sent)."""
     ev = []
     for r in rows:
         t = dt.datetime.fromisoformat(r["start_time"]).timestamp() * 1000
@@ -95,6 +99,7 @@ def peak_queue(rows):
 
 
 def main(path):
+    """Print Tables 2a, 2b and 3 (and the load-mix table) from results.csv."""
     rows = list(csv.DictReader(open(path)))
     by = defaultdict(list)
     phases = defaultdict(set)
@@ -198,6 +203,7 @@ def main(path):
 
 
 def footnote():
+    """The Table 3 footnote (n, noise, grading)."""
     print("\nTable 3: n = 20 questions per setting (13 answerable, 7 not), one run each, graded by hand from a blinded "
           "copy. One question is 5.0 percentage points, so differences of 1-2 questions between settings are noise.")
     print("\nPrices: Groq on-demand, USD per 1M tokens: gpt-oss-120b $0.15 in / $0.60 out; gpt-oss-20b "

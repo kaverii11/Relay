@@ -70,6 +70,7 @@ def schedule(sc, rng, draft_share, sampler=None, repeat_share=0.0, max_minutes=N
 
 
 def main():
+    """Run one load scenario against the stand-in and write its results and events."""
     ap = argparse.ArgumentParser()
     ap.add_argument("scenario", choices=list(SCENARIOS))
     ap.add_argument("--port", type=int, default=8099)

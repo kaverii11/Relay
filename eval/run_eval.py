@@ -54,6 +54,7 @@ REDRAFT_MEASURED = 0.30     # check replay 2026-11-10, n=10 (DECISIONS §39)
 
 
 def order_ids(pool, seed):
+    """The eval question ids in a seeded random order."""
     ids = sorted((p["id"] for p in pool if p["set"] == "eval"), key=lambda s: int(s[1:]))
     random.Random(seed).shuffle(ids)
     return ids
@@ -84,6 +85,7 @@ def worst_tokens(draft_in_by_setting):
 
 
 def reading_block(p, setting, rec):
+    """One question x setting as readable Markdown: reply, checks, drafts, passages (for grading)."""
     row, res, ev = rec["row"], rec["result"], rec["events"]
     ret = next((e for e in ev if e["ev"] == "retrieve"), {})
     checks = {c["round"]: c for c in ev if c["ev"] == "check"}
@@ -121,6 +123,7 @@ def reading_block(p, setting, rec):
 
 
 def main():
+    """Plan (or run, with --go) the eval: every eval question on every setting, until the token ceiling."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--plan", action="store_true")
     ap.add_argument("--go", action="store_true")
@@ -181,6 +184,7 @@ def main():
     wq = worst_tokens(draft_in)
 
     def price(r):
+        """Expected requests and tokens per model at redraft rate r."""
         n = len(qs)
         s_tok = n * len(names) * ((UNDERSTAND_IN + UNDERSTAND_OUT) + (1 + r) * (CHECK_IN + CHECK_OUT))
         b_tok = sum(n * (1 + r) * (draft_in[nm] + DRAFT_OUT) for nm in names)
@@ -209,6 +213,7 @@ def main():
     # forecast of the question boundary where the run stops (K: run until the ceiling, stop at a boundary)
     eq = {m: exp[m]["tok"] / max(1, len(qs)) for m in (SMALL, BIG)}      # expected tokens per question at 30%
     def stops_after(per_q_spend):
+        """How many questions fit before the worst case would pass the 24 h ceiling."""
         used = {m: u[m]["tokens"] for m in (SMALL, BIG)}
         for i, p in enumerate(qs):
             if any(used[m] + wq[m] > CEILING for m in (SMALL, BIG)):      # the check is always worst-case

@@ -38,14 +38,17 @@ def facts(p):
 
 
 def has(kind, f, tokens, key):
+    """Whether a fact (number token or word key) is in the text."""
     return f in tokens if kind == "num" else f in key
 
 
 def toks(text):
+    """The text's tokens with brackets and punctuation stripped."""
     return {t.strip("()[],;:%") for t in re.split(r"[\s±]+", text) if t}
 
 
 def main():
+    """For each question: is the table header in a different piece from the answer's row?"""
     path = Path(sys.argv[1])
     ids = set(sys.argv[sys.argv.index("--ids") + 1].split(",")) if "--ids" in sys.argv else None
     qs = [p for p in load_pool(path) if ids is None or p["id"] in ids]

@@ -31,6 +31,7 @@ G = {"correct": "correct", "wrong": "WRONG", "refused_correctly": "ref. ok", "re
 
 
 def main():
+    """Per question x setting: reply, grade, and why each check passed or failed."""
     run = sys.argv[1]
     meta = json.loads((ROOT / f"raw/meta_{run}.json").read_text())
     names = meta["settings"]

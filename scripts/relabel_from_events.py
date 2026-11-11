@@ -29,6 +29,7 @@ from relay.service import COLUMNS  # noqa: E402
 
 
 def exhaustion_instant(lines):
+    """When the 120b day budget stopped serving drafts in a run (reserve or 429), from its events."""
     best = None
     for ln in lines:
         t0 = dt.datetime.fromisoformat(ln["row"]["start_time"]).timestamp()
@@ -45,6 +46,7 @@ def exhaustion_instant(lines):
 
 
 def main(paths):
+    """Fill the daily_phase column (before / after) of each run's results from its event log."""
     for p in map(Path, paths):
         if ".orig." in p.name:
             continue

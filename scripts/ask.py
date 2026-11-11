@@ -30,6 +30,7 @@ GROQ = "https://api.groq.com/openai/v1"
 
 
 def main():
+    """Plan, or with --go ask, one question on a chosen setting; print the reply, citations and checks."""
     ap = argparse.ArgumentParser()
     ap.add_argument("question")
     ap.add_argument("--go", action="store_true", help="send it (real Groq unless --base-url)")

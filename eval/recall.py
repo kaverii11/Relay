@@ -42,6 +42,7 @@ RRF_K = 60
 
 
 def labelled(row, chunks):
+    """Per cited paper: the pieces on its cited pages that hold a must_include fact (all of them if none does)."""
     papers = [x.strip() for x in row["meta"]["paper"].split(";") if x.strip()]
     pages = [x.strip() for x in row["meta"]["page"].split(";") if x.strip()]
     facts = [match_key(f) for f in row["meta"].get("must_include", "").split(";")
@@ -59,6 +60,7 @@ def labelled(row, chunks):
 
 
 def found(groups, ranked, n):
+    """True if every cited paper's labelled piece is among the first n."""
     top = set(ranked[:n])
     return all(g & top for g in groups)
 
@@ -71,6 +73,7 @@ def first_rank(groups, ranked):
 
 
 def main():
+    """Print recall at several k for one piece size."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--words", type=int, default=250)
     a = ap.parse_args()

@@ -21,6 +21,7 @@ PAPERS = {
 
 
 def main():
+    """Download the three PDFs at their pinned versions and check their sha256."""
     out = ROOT / "papers"
     out.mkdir(exist_ok=True)
     ok = True

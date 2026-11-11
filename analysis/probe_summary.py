@@ -11,6 +11,7 @@ import numpy as np
 
 
 def pct(xs, ps=(50, 90, 95, 99)):
+    """Percentiles of the values with n (linear interpolation)."""
     xs = np.array([x for x in xs if x is not None], dtype=float)
     if len(xs) == 0:
         return "n=0"

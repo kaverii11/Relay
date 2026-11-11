@@ -55,10 +55,12 @@ def parse(md: Path, key: dict | None):
 
 
 def label_of(g):
+    """The grade word at the start of a grade line ('correct', 'wrong', ...)."""
     return re.split(r"[\s,;:]|\s-\s", g, maxsplit=1)[0].lower()
 
 
 def main():
+    """Join K's grades back to rows through the blind key; --write puts them in the results file."""
     md = Path(sys.argv[1])
     write = "--write" in sys.argv
     blind = md.name.startswith("blind_reading_")

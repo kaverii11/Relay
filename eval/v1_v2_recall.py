@@ -36,6 +36,7 @@ CANDS = [("BM25 order", 3), ("BM25 order", 6), ("re-rank", 6)]
 
 
 def table_text_by_page():
+    """Text inside captioned table regions, per paper and page."""
     out = {}
     for pid in ("1706.03762v7", "2410.00037v1", "2507.07955v2"):
         doc = pymupdf.open(ROOT / f"papers/{pid}.pdf")
@@ -49,6 +50,7 @@ def table_text_by_page():
 
 
 def is_table_q(p, ttext):
+    """Table question = a must_include fact sits inside a table region on a cited page."""
     facts = facts_of(p)
     papers = [x.strip() for x in p["meta"]["paper"].split(";") if x.strip()]
     pages = [x.strip() for x in p["meta"]["page"].split(";") if x.strip()]
@@ -63,6 +65,7 @@ def is_table_q(p, ttext):
 
 
 def main():
+    """Recall v1 vs v2 (table and other questions) and the 250/3 cutoff for each."""
     pool = {p["id"]: p for p in load_pool()}
     rw = load_rewrites()
     cross_encoder()
@@ -82,6 +85,7 @@ def main():
         cache = {}
 
         def s20(q):
+            """Top-20 search for a query, cached."""
             if q not in cache:
                 hits, g20, _ = ret.search(q, k=20)
                 cache[q] = (hits, sorted(hits, key=lambda h: -h.bm25), g20)
@@ -96,6 +100,7 @@ def main():
                 qs = [p["q"]] + ([q_rw] if is_rw else [])
 
                 def g(q):
+                    """Gate score of a query under this setting."""
                     ce, bm, g20 = s20(q)
                     return g20 if name == "re-rank" else max(h.ce for h in bm[:k])
                 win = max(qs, key=g)
@@ -106,6 +111,7 @@ def main():
         rows = []
         for p, q_rw in gate_rows:
             def g3(q):
+                """Gate score with the top 3 BM25 pieces."""
                 _, bm, _ = s20(q)
                 return max(h.ce for h in bm[:3])
             s = max(g3(p["q"]), g3(q_rw) if q_rw else -1e9)

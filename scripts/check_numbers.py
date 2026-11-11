@@ -24,6 +24,7 @@ SKIP_BEFORE = re.compile(r"(§|Q|B|T|Table |Tables |v|sec |p\.|pp\.|~?Limit |\bn
 
 
 def numbers(text):
+    """Every number in a line of prose, skipping ids, dates, versions and placeholders."""
     text = re.sub(r"`\[(GAP|K)[^`]*`", " ", text)                  # placeholders
     text = re.sub(r"\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}:\d{2}(?::\d{2})?\b", " ", text)   # dates, clock times
     text = re.sub(r"\b(gpt-oss-)?(20|120)b\b|\b\d{4}\.\d{5}v\d\b", " ", text)        # model / paper ids
@@ -41,6 +42,7 @@ def numbers(text):
 
 
 def forms(tok):
+    """The ways a number may be written in a source (1,237 / 1237; 35.0 / 35)."""
     v = tok.replace(",", "")
     f = {tok, v}
     if "." in v:
@@ -51,10 +53,12 @@ def forms(tok):
 
 
 def found_in(tok, text):
+    """True if the number appears as a whole token in the text."""
     return any(re.search(rf"(?<![\d.]){re.escape(x)}(?![\d])", text) for x in forms(tok))
 
 
 def main():
+    """List write-up numbers with no source in results.csv, probe/FINDINGS.md or DECISIONS.md."""
     md = (ROOT / "writeup/writeup.md").read_text()
     prose = md[md.index("## 1. What I built and why"):md.index("## Results tables")]
     t1 = md[md.index("### Table 1"):md.index("### Table 2a")]

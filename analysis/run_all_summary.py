@@ -23,6 +23,7 @@ from relay.config import Policy  # noqa: E402
 
 
 def main(path):
+    """One line per load scenario from the run_all log."""
     txt = Path(path).read_text()
     starts = re.findall(r"=== (\d\d:\d\d:\d\d) start (\S+) (.*?) -> (\S+)", txt)
     deadline = Policy().system_deadline_ms

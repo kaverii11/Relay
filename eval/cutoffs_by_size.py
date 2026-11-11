@@ -36,12 +36,14 @@ KS = (2, 3, 4, 6, 8)
 
 
 def facts_of(p):
+    """The question's must_include facts as match keys (long enough to be specific)."""
     fs = [match_key(f) for f in p["meta"].get("must_include", "").split(";")
           if f.strip() and not re.match(r"(?i)(not|no)\b", f.strip())]
     return [f for f in fs if len(f) >= MIN_KEY]
 
 
 def windows(text):
+    """A long piece split into cross-encoder windows."""
     w = text.split()
     out = []
     for j in range(0, max(1, len(w)), WINDOW_WORDS):
@@ -52,6 +54,7 @@ def windows(text):
 
 
 def errors_at(rows, c):
+    """Who a cutoff gets wrong: answerable refused, false-premise refused, should-refuse passed."""
     ar = [r["id"] for r in rows if r["ans"] and r["s"] < c]
     fp = [r["id"] for r in rows if not r["ans"] and r["ge"] == "pass" and "false premise" in r["type"].lower() and r["s"] < c]
     rp = [r["id"] for r in rows if r["ge"] == "refuse" and r["s"] >= c]
@@ -72,6 +75,7 @@ def cutoff(rows):
 
 
 def main():
+    """Cutoff per piece size and setting by K's midpoint rule, tuning questions only."""
     pool = {p["id"]: p for p in load_pool()}
     rw = load_rewrites()
     cross_encoder()
@@ -102,6 +106,7 @@ def main():
             rows = []
             for p, per_q in base:
                 def g(x):
+                    """Gate score of one question under this setting."""
                     return x["gate20"] if rr == "yes" else max(h.ce for h in x["bm"][:k])
                 s = max(g(per_q["raw"]), g(per_q["rewrite"]))
                 rows.append({"id": p["id"], "ans": p["ans"], "ge": p["meta"]["gate_expected"].lower(), "type": p["type"], "s": s})
