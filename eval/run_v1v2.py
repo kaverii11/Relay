@@ -7,13 +7,16 @@ window frees.
 
 Arms, both 250 words / 3 pieces / BM25 order, cutoff 0.713, retrieval and gate on the piece body (§56):
   v1 = SETTINGS["chosen"],    Policy()                   (the measured system)
-  v2 = SETTINGS["chosen_v2"], Policy(check_prompt="v2", draft_prompt="v2")  (change a: table caption + header prefix, and the drafter told to quote only the paper text after it; change b:
-                                                          number-provenance check, output cap 800)
+  v2 = SETTINGS["chosen_v3a"], Policy(check_prompt="v2", draft_prompt="v2", sticky_check_fail=True)
+       (K 2026-11-11 change a: table caption + header prefix, and the drafter told to quote only the paper text after
+        it; change b: number-provenance check, output cap 800. K 2026-11-12, folded into v2 for accuracy (§65):
+        change c = paper hint, append mode; change d = sticky model-check failure. v2 is now 4 changes, measured
+        together; their separate effects are NOT separable in this run.)
 The question file is separate from eval/k_questions.csv (never in its eval/tuning split): set = "new", and an
 `author` column on every row ("K", or the tool's name for questions K did not write). Same safeguards as the
 eval (§41): seeded question order and per-question arm rotation, ITPM-derived spacing, worst-case 170k ceiling
 check before every question (stop at a question boundary), answer cache off, a per-day 429 is saved and stops
-the run. Rows are tagged by setting name (w250_k3_rr0 / w250_k3_rr0_v2) and run_variant "v1v2".
+the run. Rows are tagged by setting name (w250_k3_rr0 / w250_k3_rr0_v2_pha) and run_variant "v1v2".
 """
 from __future__ import annotations
 
@@ -40,7 +43,8 @@ from relay.pipeline import Pipeline  # noqa: E402
 from relay.retrieval import Retriever, cross_encoder  # noqa: E402
 from relay.service import Service, write_csv  # noqa: E402
 
-ARMS = {"chosen": Policy, "chosen_v2": lambda: Policy(check_prompt="v2", draft_prompt="v2")}
+ARMS = {"chosen": Policy,
+        "chosen_v3a": lambda: Policy(check_prompt="v2", draft_prompt="v2", sticky_check_fail=True)}   # = v2 (K §65)
 
 
 def load_new(path):
@@ -92,9 +96,10 @@ def main():
                            setting=SETTINGS[nm], policy=ARMS[nm](), limiter=lim, cache=None, retriever=ret, budget=budget)
         pls[nm].keep_passages = True
         pls[nm].daily_dump = ROOT / f"raw/daily429_{run}.json"
-    draft_in = {nm: round(pls[nm].draft_est(SETTINGS[nm].k)) for nm in names}
-    check_in = {"chosen": CHECK_IN, "chosen_v2": CHECK_IN + 60}          # v2 prompt is ~60 tokens longer
-    check_out = {"chosen": CHECK_OUT, "chosen_v2": 300}                 # v2 replies: p50 130, p95 313 (replay §58)
+    # v2's paper hint can add one piece (append mode): plan for k + 1
+    draft_in = {nm: round(pls[nm].draft_est(SETTINGS[nm].k + (1 if SETTINGS[nm].paper_hint else 0))) for nm in names}
+    check_in = {"chosen": CHECK_IN, "chosen_v3a": CHECK_IN + 60}          # v2 prompt is ~60 tokens longer
+    check_out = {"chosen": CHECK_OUT, "chosen_v3a": 300}                 # v2 replies: p50 130, p95 313 (replay §58)
     gaps = {nm: gap_seconds(draft_in[nm], a.min_gap) for nm in names}
     wq = worst_tokens(draft_in)
     wq[SMALL] += sum(2 * ((check_in[nm] - CHECK_IN) + (check_out[nm] - CHECK_OUT)) for nm in names)
@@ -110,13 +115,13 @@ def main():
     print(f"[v1v2] run {run}: target {'REAL Groq' if real else a.base_url}; {len(ids)} questions x {len(names)} arms = "
           f"{n_runs} pipeline runs; 250/3 BM25 order, cutoff {SETTINGS['chosen'].cutoff(Policy())} (both arms), "
           f"retrieval + gate on the piece body; answer cache OFF; deadline {Policy().system_deadline_ms:.0f} ms")
-    print(f"  arms: v1 = chosen (draft v1, check v1, cap 400); v2 = chosen_v2 (table prefix + draft v2 'quote only the paper text' + check v2, cap {Policy().check_max_tokens_v2})")
+    print(f"  arms: v1 = chosen (draft v1, check v1, cap 400); v2 = chosen_v3a (table prefix + draft v2 'quote only the paper text' + check v2, cap {Policy().check_max_tokens_v2}; + paper hint append + sticky check failure, K §65)")
     print(f"  question order (seed {a.seed}): {','.join(ids)}; arms rotated per question")
     for q in ids:
         p = pool[q]
         print(f"    {q:4s} {'ans' if p['ans'] else 'un '} author {p['meta'].get('author', '?'):8s} [{' > '.join(rotation[q])}]  {p['q'][:90]}")
-    print(f"  draft prompt est: v1 ~{draft_in['chosen']}, v2 ~{draft_in['chosen_v2']} tokens (v2 adds the table prefix); "
-          f"spacing {gaps['chosen']:.0f} / {gaps['chosen_v2']:.0f} s")
+    print(f"  draft prompt est: v1 ~{draft_in['chosen']}, v2 ~{draft_in['chosen_v3a']} tokens (v2 adds the table prefix); "
+          f"spacing {gaps['chosen']:.0f} / {gaps['chosen_v3a']:.0f} s")
     print(f"  requests: at the measured redraft rate {REDRAFT_MEASURED:.0%} ~{math.ceil(exp[SMALL]['req'] + exp[BIG]['req'])}, "
           f"worst {math.ceil(worst[SMALL]['req'] + worst[BIG]['req'])}; run cap {cap}")
     for m in (SMALL, BIG):
