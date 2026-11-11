@@ -44,7 +44,7 @@ def _keep_headers(h: httpx.Headers) -> dict:
 def stream_chat(messages, model, *, base_url=GROQ_BASE, api_key=None, max_tokens=400,
                 temperature=0.0, timeout_s=30.0, client: httpx.Client | None = None,
                 extra=None) -> CallResult:
-    """One streaming chat call (Groq or the stand-in), timing the first answer token. Never raises."""
+    """One streaming chat call (Groq or the stand-in), timing the first answer token. Timeouts and HTTP errors come back in the result (error_kind), not as exceptions."""
     api_key = api_key or os.environ.get("GROQ_API_KEY", "")
     body = {"model": model, "messages": messages, "max_tokens": max_tokens,
             "temperature": temperature, "stream": True,
