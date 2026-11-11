@@ -122,7 +122,7 @@ def part_b(L):
 
 def part_a(L):
     L += ["", "## A. Sticky check failure, replayed on every stored real run (drafts + both verdicts logged)", ""]
-    files = sorted((ROOT / "raw").glob("events_e2e_*.jsonl")) + sorted((ROOT / "raw").glob("events_eval_*.jsonl")) \
+    files = sorted((ROOT / "raw").glob("events_e2e_*.jsonl")) + sorted((ROOT / "raw").glob("events_eval_day*.jsonl")) \
         + sorted((ROOT / "raw").glob("ask_*.jsonl"))
     n_q = n_rej = 0
     hits = []
@@ -132,7 +132,7 @@ def part_a(L):
             ev = rec.get("events", [])
             drafts = [e for e in ev if e["ev"] == "draft_out"]
             checks = [e for e in ev if e["ev"] == "check"]
-            if not drafts:
+            if not drafts or rec.get("row", {}).get("source") not in (None, "groq"):
                 continue
             n_q += 1
             rejected = []
