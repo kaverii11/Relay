@@ -40,7 +40,7 @@ plain-text questions that name no table or paper, a false premise, and two unans
 at her request (three header-split questions, one shared-vocabulary question that tests v3's paper hint, and four
 easy baseline facts). Every expected answer was checked against the rendered PDF pages. They were graded by Claude
 Code at Kaveri's request (arms hidden, `eval/blind_reading.py`; not fully blind: the grader had seen the run's
-console log of reply kinds), an exception to her no-LLM-judge rule for the eval (§67); her re-check is pending.
+console log of reply kinds), an exception to her no-LLM-judge rule for the eval (§67). She re-checked the 18 where versions disagreed against the papers and reviewed the other 42; none changed.
 Table 3's eval answers (her 20 held-out questions) were graded by her.
 
 **Result** (run `v1v2_20261112_133034`, 12 Nov 13:30-13:58 IST; Table 4 of the write-up; DECISIONS §73): correct
