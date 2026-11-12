@@ -64,7 +64,7 @@ The time is the limiter's longest counter wait, an estimate because the tokens-p
 
 ## 8. What I'm unsure about, what I left out, what I learned
 
-**Least certain assumption:** patience, modelled as lognormal with a 15 s median and never measured. If people wait longer, the 8 s deadline throws away answers; if less, they leave before any reply: the request is cancelled, its stream closed, nothing sent late.
+**Least certain assumption:** patience, modelled as lognormal with a 15 s median and never measured. If people wait longer, the 8 s deadline throws away answers; if less, they leave before any reply: the request is cancelled, its stream closed, nothing sent late. A cut stream's estimated cost still counts (limiter, pacing, 24 h ledger); a call that never went out gives its reservations back.
 
 **Not built:** (1) merging identical in-flight questions: more capacity in bursts, but one failure hits everyone waiting. (2) A clarification turn: vague Q16 and Q59 (tested offline) were silently rewritten toward the Transformer paper; my rubric has no reply type for asking back.
 

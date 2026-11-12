@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import itertools
 import json
 import threading
 import time
@@ -69,21 +70,31 @@ class Budget:
         self.run, self.request_cap, self.ceiling = run, request_cap, ceiling
         self.run_sent, self.stopped = 0, None
         self.lock = threading.Lock()
-        # check-then-act fix: estimates of calls that passed reserve() but haven't been recorded yet, per model,
-        # oldest first: [(monotonic time, tokens)]. Without this, 16 workers reading the ledger at the same moment
-        # would all see the same headroom and all pass.
-        self.inflight: dict[str, list[tuple[float, int]]] = {}
+        # check-then-act fix: estimates of calls that passed reserve() but haven't been recorded yet, per model:
+        # {reservation id: (monotonic time, tokens)}. Without this, 16 workers reading the ledger at the same moment
+        # would all see the same headroom and all pass. Each call removes ITS OWN entry by id (record / release), so
+        # calls finishing out of order can't remove another call's larger reservation and under-count what is in flight.
+        self.inflight: dict[str, dict[int, tuple[float, int]]] = {}
+        self._ids = itertools.count(1)
 
     def _inflight(self, model) -> int:
         """Tokens reserved but not yet recorded for this model (stale reservations dropped)."""
         now = time.monotonic()
-        live = [x for x in self.inflight.get(model, []) if now - x[0] < INFLIGHT_TTL_S]
+        live = {i: x for i, x in self.inflight.get(model, {}).items() if now - x[0] < INFLIGHT_TTL_S}
         self.inflight[model] = live
-        return sum(t for _, t in live)
+        return sum(t for _, t in live.values())
 
-    def reserve(self, model, est_in, est_out):
+    def _drop(self, model, res_id):
+        """Remove one in-flight reservation: by id; without an id (older callers), the oldest one. Caller holds the lock."""
+        live = self.inflight.get(model, {})
+        if res_id is None:
+            res_id = next(iter(live), None)        # insertion order = oldest first
+        live.pop(res_id, None)
+
+    def reserve(self, model, est_in, est_out) -> int:
         """Before a real call: refuse (DailyLimit) if the run cap or the 24 h ceiling would be passed,
-        counting calls still in flight. An unreadable ledger refuses too (fail closed)."""
+        counting calls still in flight. An unreadable ledger refuses too (fail closed). Returns the reservation id,
+        which the caller passes back to record() or release()."""
         with self.lock:
             if self.run_sent >= self.request_cap:
                 self.stopped = self.stopped or f"run request cap {self.request_cap} reached"
@@ -99,24 +110,21 @@ class Budget:
                                                 f"+ ~{est_in + est_out} would pass the {self.ceiling} ceiling")
                 raise DailyLimit(model, "budget")
             self.run_sent += 1
-            self.inflight.setdefault(model, []).append((time.monotonic(), est_in + est_out))
+            res_id = next(self._ids)
+            self.inflight.setdefault(model, {})[res_id] = (time.monotonic(), est_in + est_out)
+            return res_id
 
-    def release(self, model, est_in, est_out):
+    def release(self, model, res_id):
         """A reserved call never reached the provider (cancelled while waiting, cancelled before sending, or turned
         away by our limiter): undo reserve(), so it uses up neither the run's request cap nor in-flight headroom."""
         with self.lock:
             self.run_sent = max(0, self.run_sent - 1)
-            live = self.inflight.get(model, [])
-            for i in range(len(live) - 1, -1, -1):     # this call's own entry: the newest with its estimate
-                if live[i][1] == est_in + est_out:
-                    live.pop(i)
-                    break
+            self._drop(model, res_id)
 
-    def record(self, model, tokens_in, tokens_out, status):
-        """After a real call: append it to the ledger (locked, atomic) and release its in-flight reservation."""
+    def record(self, model, tokens_in, tokens_out, status, res_id=None):
+        """After a real call: append it to the ledger (locked, atomic) and release ITS in-flight reservation."""
         with self.lock:
-            if self.inflight.get(model):
-                self.inflight[model].pop(0)          # calls of one model are interchangeable for the total
+            self._drop(model, res_id)
             with ledger.locked():
                 d = _read()
                 d.setdefault("calls", []).append([_now().isoformat(timespec="seconds"), model,

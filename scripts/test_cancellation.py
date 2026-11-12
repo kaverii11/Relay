@@ -17,6 +17,8 @@ with three fixed pieces. Covers:
  10. accounting, never sent (gave up during the limiter wait, gave up just before sending, turned away by the
      limiter): run budget (request count + in-flight) and limiter reservations are given back; run_sent always
      equals the requests that reached the provider
+ 11. budget, out of order: concurrent reservations of different sizes finishing in any order each remove their own
+     entry (by reservation id), so in flight always equals the calls still running
 Ledger writes go to a temporary ledger; the real probe/raw/ledger.json is never touched.
 """
 from __future__ import annotations
@@ -395,6 +397,50 @@ def test_never_sent_releases():
         "run budget and limiter reservations given back; run_sent = requests sent (0, 0, 1; normal answer 3)")
 
 
+def test_budget_out_of_order():
+    """Each call removes ITS reservation: no under-count when calls finish out of order."""
+    import random
+    b = budget()
+    a = b.reserve(BIG, 150, 50)                                            # A: 200 tokens
+    bb = b.reserve(BIG, 70, 30)                                            # B: 100 tokens, finishes first
+    b.record(BIG, 60, 20, 200, res_id=bb)
+    assert b._inflight(BIG) == 200, b._inflight(BIG)                       # A still counted in full (was 100)
+    b.record(BIG, 140, 60, 200, res_id=a)
+    assert b._inflight(BIG) == 0
+    c, d = b.reserve(SMALL, 100, 0), b.reserve(SMALL, 100, 0)              # same size: release must pick D, not C
+    b.release(SMALL, d)
+    assert list(b.inflight[SMALL]) == [c], b.inflight[SMALL]
+    b.record(SMALL, 100, 0, 200, res_id=c)
+
+    # 12 workers reserve at once (sizes 100..1200), then finish in a shuffled order
+    sizes = [100 * (i + 1) for i in range(12)]
+    ids, go, done = {}, [threading.Event() for _ in sizes], [threading.Event() for _ in sizes]
+    ready = threading.Barrier(len(sizes) + 1)
+
+    def worker(i):
+        ids[i] = b.reserve(BIG, sizes[i] - 10, 10)
+        ready.wait()                                                       # all 12 in flight together
+        go[i].wait()
+        b.record(BIG, sizes[i] - 10, 10, 200, res_id=ids[i])
+        done[i].set()
+    ts = [threading.Thread(target=worker, args=(i,)) for i in range(len(sizes))]
+    for t in ts:
+        t.start()
+    ready.wait()
+    assert b._inflight(BIG) == sum(sizes), b._inflight(BIG)
+    running = set(range(len(sizes)))
+    for i in random.Random(7).sample(range(len(sizes)), len(sizes)):
+        go[i].set()
+        assert done[i].wait(5)
+        running.discard(i)
+        assert b._inflight(BIG) == sum(sizes[j] for j in running), (i, b._inflight(BIG))
+    for t in ts:
+        t.join()
+    assert b.run_sent == 2 + 2 + 12 - 1 and not b.inflight[BIG]
+    _ok("budget, out of order: B (100) recorded before A (200) leaves A's 200 in flight; same-size release removes its "
+        "own entry; 12 concurrent reservations finishing shuffled always leave exactly the running ones")
+
+
 def main():
     """Run every test; exit 1 on the first failure."""
     before = REAL.stat().st_mtime if REAL.exists() else None
@@ -408,6 +454,7 @@ def main():
     test_service()
     test_cut_accounting()
     test_never_sent_releases()
+    test_budget_out_of_order()
     assert (REAL.stat().st_mtime if REAL.exists() else None) == before, "real ledger was touched"
     print("all passed; the real ledger was not touched")
 

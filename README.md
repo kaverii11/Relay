@@ -162,7 +162,8 @@ sends nothing) and `--go`; each `--go` was approved by K after its plan.
 What protects the key, the daily budget and the service, and how each one is tested.
 `scripts/test_guardrails.py`, `scripts/test_pacing.py` and `scripts/test_cancellation.py` run offline: no tokens, and the
 real ledger is never touched. `test_guardrails.py` needs the PDFs (`library/fetch_papers.py`, see Setup);
-`test_cancellation.py` uses a fake model server and fake passages, so it needs neither the PDFs nor the network.
+`test_cancellation.py` uses a fake model server, fake passages and a temporary ledger, so it needs neither the PDFs
+nor the network; it also checks the accounting above (run_sent always equals the requests that reached the provider).
 
 | Risk | Guardrail | Where |
 |---|---|---|
@@ -175,7 +176,7 @@ real ledger is never touched. `test_guardrails.py` needs the PDFs (`library/fetc
 | Prompt injection | every claim must quote a passage word for word (code check) and pass the 20b check; the worst outcome is a refusal or "couldn't verify", never an unchecked answer | `pipeline.py` |
 | Overload | own limiter predicts 429s; deadline turns hopeless waits into a busy reply with an ETA; optional `max_queue` sheds at the door; bounded LRU cache | `limiter.py`, `service.py` |
 | Retry storms | retries capped per question and at 10 % of the last minute's requests (floor of 2), with jitter | `pipeline.py`, `limiter.py` |
-| Work for people who left | when patience runs out, the live model stream is closed, no new call / retry / redraft starts, and no late reply is sent (row: given up); a worker survives a request that raises | `llm.py`, `pipeline.py`, `service.py` |
+| Work for people who left | when patience runs out, the live model stream is closed, no new call / retry / redraft starts, and no late reply is sent (row: given up); a cut stream's estimated cost stays counted (limiter reservation kept, pacing spend, 24 h ledger), while a call that never reached Groq (gave up while waiting, or turned away by our limiter) gives back its run-budget and limiter reservations; a worker survives a request that raises | `llm.py`, `pipeline.py`, `limiter.py`, `budget.py`, `service.py` |
 
 To run as several instances, the next step is to move the limiter's buckets and the ledger into one shared store
 (Redis or Postgres), so every instance spends from the same Groq budget, and to put auth and per-user quotas at

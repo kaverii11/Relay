@@ -1522,6 +1522,13 @@ was still delivered as a success. A request that raised killed its worker thread
   acquired, its limiter reservation (`Limiter.release()`, the exact inverse of acquire), and writes no ledger entry.
   Invariant tested: run_sent = requests that reached the provider. Neither path occurred in a measured run (the stand-in
   runs have no run budget; the real runs had no limiter busy and no give-ups).
+- **Second follow-up (same day): reservations removed by id.** `Budget.record()` dropped the OLDEST in-flight entry and
+  `release()` matched by token amount, so with concurrent workers a call finishing first could remove another call's
+  larger reservation (A reserves 200, B 100, B records first: in flight read 100 while A still ran), under-counting in
+  flight against the 170k ceiling for that model. Now `reserve()` returns a reservation id and `record()` / `release()`
+  remove exactly that entry (record without an id keeps the old oldest-first behaviour for direct callers). Test: A/B
+  out of order, same-size release, and 12 concurrent reservations finishing in a shuffled order. The error was only in
+  the temporary in-flight estimate: the ledger always recorded each call's actual tokens, so no recorded total changes.
 - **Worker bookkeeping.** try/finally: timer cancelled and `pending` decremented always; an exception gives an error
   row, a `worker_error` event and a traceback on stderr (not swallowed), and the worker serves the next request.
 - Tests: `scripts/test_cancellation.py`, offline (fake model server, fake passages; no PDFs, no network): cancel before

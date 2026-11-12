@@ -231,8 +231,9 @@ class Pipeline:
             max_wait = max(0.0, (left_ms - EXPECTED_WORK_MS.get(kind, 550)) / 1000)
             if kind == "draft" and ctx.draft_ready_ms is None:
                 ctx.draft_ready_ms = ctx.ms()
+            res_id = None                        # this call's run-budget reservation (released / recorded by id)
             if self.budget is not None:          # real-run caps (K §31), checked before anything is spent
-                self.budget.reserve(model, n_in, out_est)
+                res_id = self.budget.reserve(model, n_in, out_est)
             acquired = False
             try:
                 wait, binding, ok = self.lim.acquire(model, n_in, out_est, max_wait)
@@ -248,7 +249,7 @@ class Pipeline:
                         self.queued_drafts.discard(ctx.rid)    # its tokens now live in the limiter's buckets
                 ctx.sleep(wait + 0.05 if wait > 0 else 0, "waiting")
             except BaseException:                # never sent (turned away, or gave up while waiting): give it back
-                self._release(model, n_in, out_est, acquired)
+                self._release(model, n_in, out_est, acquired, res_id)
                 raise
             ctx.limiter_wait_ms += wait * 1000
             if kind == "draft" and ctx.draft_sent_ms is None:
@@ -270,7 +271,7 @@ class Pipeline:
             # Cancelled before sending (status 0): nothing reached the provider, so every reservation is given back.
             cut = r.error_kind == "cancelled" and r.status != 0
             if r.error_kind == "cancelled" and not cut:
-                self._release(model, n_in, out_est, True)
+                self._release(model, n_in, out_est, True, res_id)
                 ctx.calls -= 1
                 ctx.ev("call_end", step=kind, model=model, attempt=attempt, status=0, err="cancelled", sent=False)
                 raise Cancelled("before_call")
@@ -281,7 +282,7 @@ class Pipeline:
                 self.lim.settle(model, out_est, r.tokens_out, r.tokens_in)   # actual_in: logs the spend for pacing
             if self.budget is not None:
                 self.budget.record(model, r.tokens_in or (n_in if cut else 0),
-                                   r.tokens_out or (out_est if cut else 0), r.status)
+                                   r.tokens_out or (out_est if cut else 0), r.status, res_id=res_id)
             ctx.tokens_in += r.tokens_in
             ctx.tokens_out += r.tokens_out          # completion_tokens: reasoning is inside it (measured, stage 1)
             ctx.tokens_cached += r.cached_tokens
@@ -496,11 +497,11 @@ class Pipeline:
             with self.qlock:
                 self.queued_drafts.discard(ctx.rid)
 
-    def _release(self, model, n_in, out_est, acquired):
+    def _release(self, model, n_in, out_est, acquired, res_id):
         """Undo the reservations of a call that never reached the provider: the run budget's (request cap +
-        in-flight tokens) and, if acquire() succeeded, the limiter's."""
+        in-flight tokens, by reservation id) and, if acquire() succeeded, the limiter's."""
         if self.budget is not None:
-            self.budget.release(model, n_in, out_est)
+            self.budget.release(model, res_id)
         if acquired:
             self.lim.release(model, n_in, out_est)
 
