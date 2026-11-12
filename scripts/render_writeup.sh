@@ -9,7 +9,7 @@ cat > "$T/p.css" <<'CSS'
 html, body { font-family: Helvetica, Arial, sans-serif !important; font-size: 9.5pt !important; line-height: 1.2 !important;
              max-width: none !important; padding: 0 !important; margin: 0 !important; }
 h1 { font-size: 14pt !important; } h2 { font-size: 12pt !important; margin: 8px 0 3px !important; } h3 { font-size: 11pt !important; }
-p, li { margin: 3px 0 !important; } blockquote { margin: 4px 16px !important; }
+p, li { margin: 3px 0 !important; } h2, h3 { break-after: avoid; } ol, ul { break-inside: avoid; } blockquote { margin: 4px 16px !important; }
 table { border-collapse: collapse; font-size: 8.5pt !important; } td, th { border: 1px solid #999; padding: 2px 4px; }
 code { font-size: 9pt !important; word-break: break-all; }
 @page land { size: A4 landscape; margin: 0.5in; }
