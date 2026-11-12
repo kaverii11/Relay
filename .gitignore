@@ -1,16 +1,19 @@
+# secrets and local environment
 .env
+.env.*
 .venv/
 __pycache__/
-papers/*.pdf
 *.pyc
-# written notes and data stay out of git (Kaveri, 2026-11-09)
-*.md
-!README.md
-probe/raw/
-raw/
-data/
 .DS_Store
-load/mix.json
-eval/rewrites_20b.json
-eval/replay_drafts.json
+
+# fetched or rebuilt locally: papers via library/fetch_papers.py (pinned versions, sha256-checked), chunks on first run
+papers/*.pdf
+data/
+
+# conversation histories: submitted to Vaani, not published (personal details)
 conversations/
+
+# lock and temp files
+*.lock
+.ledger.*.tmp
+raw/_verify_*

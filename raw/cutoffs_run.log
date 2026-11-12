@@ -1,0 +1,82 @@
+W1111 04:01:45.132000 23714 .venv/lib/python3.12/site-packages/torch/distributed/elastic/multiprocessing/redirects.py:35] NOTE: Redirects are currently not supported in MacOs.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/105 [00:00<?, ?it/s]Loading weights: 100%|██████████| 105/105 [00:00<00:00, 7186.25it/s]
+# Cutoff per setting, K's midpoint rule (fallback: fewest errors) on max(raw, rewrite), tuning questions 2026-11-11T04:01
+
+Cross-encoder window: 300 words (+40 overlap), max over windows.
+
+| words | re-rank | k sent | highest refuse | lowest answerable above | gap | **cutoff** | rule | answerable refused | false-premise refused | refuse passed | errors |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 120 | yes | (20 scored) | 1.614 (Q50) | 2.077 (Q58) | 0.463 | **1.845** | midpoint | 2: Q2, Q16 | 1: Q20 | 0: - | 3 |
+| 120 | no | 2 | 1.614 (Q50) | 1.877 (Q59) | 0.263 | **1.745** | midpoint | 5: Q1, Q2, Q16, Q42, Q58 | 1: Q20 | 0: - | 6 |
+| 120 | no | 3 | 1.614 (Q50) | 2.032 (Q59) | 0.418 | **1.823** | midpoint | 5: Q1, Q2, Q16, Q42, Q58 | 1: Q20 | 0: - | 6 |
+| 120 | no | 4 | 1.614 (Q50) | 2.662 (Q42) | 1.048 | **2.138** | midpoint | 4: Q1, Q2, Q16, Q58 | 1: Q20 | 0: - | 5 |
+| 120 | no | 6 | 1.614 (Q50) | 2.077 (Q58) | 0.463 | **1.845** | midpoint | 2: Q2, Q16 | 1: Q20 | 0: - | 3 |
+| 120 | no | 8 | 1.614 (Q50) | 2.077 (Q58) | 0.463 | **1.845** | midpoint | 2: Q2, Q16 | 1: Q20 | 0: - | 3 |
+| 250 | yes | (20 scored) | 0.354 (Q51) | 1.395 (Q42) | 1.041 | **0.875** | midpoint | 2: Q2, Q16 | 0: - | 0: - | 2 |
+| 250 | no | 2 | 0.008 (Q52) | 1.395 (Q42) | 1.387 | **0.702** | midpoint | 2: Q2, Q16 | 0: - | 0: - | 2 |
+| 250 | no | 3 | 0.031 (Q52) | 1.395 (Q42) | 1.364 | **0.713** | midpoint | 2: Q2, Q16 | 0: - | 0: - | 2 |
+| 250 | no | 4 | 0.031 (Q52) | 1.395 (Q42) | 1.364 | **0.713** | midpoint | 2: Q2, Q16 | 0: - | 0: - | 2 |
+| 250 | no | 6 | 0.031 (Q52) | 1.395 (Q42) | 1.364 | **0.713** | midpoint | 2: Q2, Q16 | 0: - | 0: - | 2 |
+| 250 | no | 8 | 0.354 (Q51) | 1.395 (Q42) | 1.041 | **0.875** | midpoint | 2: Q2, Q16 | 0: - | 0: - | 2 |
+| 500 | yes | (20 scored) | 1.816 (Q50) | 2.187 (Q59) | 0.371 | **2.002** | midpoint | 4: Q1, Q2, Q16, Q42 | 0: - | 0: - | 4 |
+| 500 | no | 2 | 1.816 (Q50) | 1.994 (Q58) | 0.178 | **1.905** | midpoint | 4: Q1, Q2, Q16, Q42 | 0: - | 0: - | 4 |
+| 500 | no | 3 | 1.816 (Q50) | 1.994 (Q58) | 0.178 | **1.905** | midpoint | 4: Q1, Q2, Q16, Q42 | 0: - | 0: - | 4 |
+| 500 | no | 4 | 1.816 (Q50) | 1.994 (Q58) | 0.178 | **1.905** | midpoint | 4: Q1, Q2, Q16, Q42 | 0: - | 0: - | 4 |
+| 500 | no | 6 | 1.816 (Q50) | 1.994 (Q58) | 0.178 | **1.905** | midpoint | 4: Q1, Q2, Q16, Q42 | 0: - | 0: - | 4 |
+| 500 | no | 8 | 1.816 (Q50) | 1.994 (Q58) | 0.178 | **1.905** | midpoint | 4: Q1, Q2, Q16, Q42 | 0: - | 0: - | 4 |
+
+512-token window check per piece size:
+
+| words | pieces | pieces longer than one window | labelled facts split by a window boundary |
+|---|---|---|---|
+| 120 | 517 | 0 | 0: - |
+| 250 | 271 | 0 | 0: - |
+| 500 | 160 | 90 | 0: - |
+
+Per question, re-rank gate (max over 20) by size:
+
+| id | answerable | gate_expected | w120 | w250 | w500 |
+|---|---|---|---|---|---|
+| Q55 | no | refuse | -10.42 | -9.81 | -9.19 |
+| Q46 | no | pass | 0.01 | -3.45 | -0.17 |
+| Q44 | no | refuse | 0.56 | -2.83 | -3.25 |
+| Q16 | yes | pass | -2.61 | -2.61 | -2.61 |
+| Q60 | no | pass | -1.95 | -2.58 | -0.82 |
+| Q53 | no | refuse | -3.24 | -2.14 | -2.14 |
+| Q2 | yes | pass | 0.11 | -1.59 | 0.53 |
+| Q54 | no | refuse | -0.24 | -0.99 | -1.03 |
+| Q50 | no | refuse | 1.61 | -0.87 | 1.82 |
+| Q21 | no | pass | -0.73 | -0.20 | -0.17 |
+| Q52 | no | refuse | 0.18 | 0.03 | 0.01 |
+| Q51 | no | refuse | 0.55 | 0.35 | 0.35 |
+| Q33 | no | pass | 1.06 | 0.80 | 1.87 |
+| Q42 | yes | pass | 2.66 | 1.40 | 0.83 |
+| Q10 | no | pass | 4.20 | 1.91 | 2.74 |
+| Q5 | yes | pass | 3.46 | 2.35 | 2.21 |
+| Q58 | yes | pass | 2.08 | 2.61 | 2.61 |
+| Q1 | yes | pass | 2.55 | 2.62 | -1.66 |
+| Q56 | yes | pass | 4.67 | 2.73 | 3.35 |
+| Q6 | yes | pass | 4.28 | 2.93 | 3.30 |
+| Q22 | no | pass | 3.11 | 3.13 | 3.13 |
+| Q27 | yes | pass | 6.38 | 3.26 | 5.18 |
+| Q37 | yes | pass | 3.66 | 3.34 | 3.58 |
+| Q28 | yes | pass | 4.75 | 3.74 | 3.24 |
+| Q36 | yes | pass | 5.75 | 3.87 | 2.94 |
+| Q38 | yes | pass | 5.73 | 4.60 | 4.07 |
+| Q20 | no | pass | 0.96 | 4.94 | 4.75 |
+| Q31 | yes | pass | 4.85 | 5.22 | 4.61 |
+| Q23 | yes | pass | 5.79 | 5.55 | 5.54 |
+| Q41 | yes | pass | 4.60 | 5.63 | 6.04 |
+| Q3 | yes | pass | 5.85 | 5.66 | 5.32 |
+| Q24 | yes | pass | 5.74 | 5.74 | 5.74 |
+| Q39 | yes | pass | 6.84 | 5.90 | 5.68 |
+| Q59 | yes | pass | 3.91 | 6.13 | 2.19 |
+| Q30 | yes | pass | 6.51 | 6.15 | 5.02 |
+| Q13 | yes | pass | 6.35 | 6.35 | 6.35 |
+| Q29 | yes | pass | 5.61 | 6.53 | 6.53 |
+| Q19 | yes | pass | 6.85 | 6.65 | 6.65 |
+| Q11 | no | pass | 6.38 | 6.78 | 4.57 |
+| Q17 | yes | pass | 6.86 | 6.86 | 6.86 |
+
+-> raw/cutoffs_by_size_20261111_040250.md

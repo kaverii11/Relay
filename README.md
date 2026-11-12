@@ -6,6 +6,30 @@ checks the draft, gpt-oss-120b drafts a cited answer. Every answer quotes the pa
 checked before it is sent; when the papers don't say, it says so. The write-up is `writeup/writeup.md`; every
 decision, with who made it and the measurement behind it, is in `DECISIONS.md`.
 
+## At a glance
+
+Built in four days as a take-home assignment (November 2026), with Claude Code as the coding assistant; the design
+decisions, measurements and grading rules are Kaveri's and are logged with their evidence in `DECISIONS.md`.
+
+- **What it does:** answers engineers' questions about three research papers, backs every claim with a word-for-word
+  quote, and refuses when the papers don't support an answer, all inside Groq's free-tier rate limits.
+- **Pipeline:** understand (gpt-oss-20b) -> BM25 retrieval (the tool call) -> cross-encoder relevance gate ->
+  draft (gpt-oss-120b) -> code check + model check, one redraft, otherwise a refusal. Around it: rate limiters fed
+  from Groq's response headers, a deadline queue, a fallback ladder (cached answer -> smaller model -> honest busy
+  reply), and an arrival check that turns a request away in ~1 ms when it can't be answered in time.
+- **Stand-in model server** with Groq's API, calibrated on 56 + 23 real calls, used for the load tests Groq's free
+  tier can't take: steady, burst, sustained overload, per-minute limit halved, daily budget exhausted
+  (1,165 stand-in requests; 132 real-Groq questions).
+- **Findings from running it:** a hidden 7,000 input-tokens/min limit, visible only in 429 error bodies, binds before
+  the advertised 8,000 tokens/min; limits refill continuously rather than at midnight; at 0.6x the per-minute
+  ceiling, steady traffic took the large model's day budget to its reserve in 41 minutes; blind retries made things
+  worse (success 64.3 % -> 60.0 %).
+- **Answer quality:** 35.0 % correct and cited on 20 held-out questions (7 of 13 answerable) on every retrieval
+  setting; plain BM25 with 3 pieces matched re-ranking at ~44 % fewer draft tokens. Two later fixes, tested on 20
+  new questions, did not beat the baseline (9 / 8 / 8 of 20).
+- **Reproducible:** `results.csv` (1,297 rows) rebuilds from `raw/`, and `scripts/verify_writeup.py` recomputes all
+  357 numbers in the write-up's tables from it. Write-up: `writeup/writeup.pdf`.
+
 ## Settings
 
 | | Setting | Where |

@@ -1,0 +1,33 @@
+
+== gpt-oss-120b spread_draft: 6 sent, 6 ok, statuses=[200]
+  first ANSWER token ms : n=6 p50=650 p90=700 p95=702 p99=704 max=705
+  first ANY token ms    : n=6 p50=583 p90=600 p95=602 p99=604 max=604
+  total ms              : n=6 p50=1100 p90=1384 p95=1408 p99=1428 max=1433
+  reasoning gap ms (answer - any): n=6 p50=89 p95=112 max=112
+  answer decode tok/s (only calls with >50 ms of answer streaming): n=6 p50=498 p10=485 max=590
+  tokens in/out/reasoning mean: 2792 / 258 / 36
+  prompt-cache hits: 0/6; first-answer-token median cached=nan uncached=650
+  slowest: ttft=705 any=593 reas_tok=49 cached=0 at 10:53:51Z q='How is residual dropout used in the Transformer pa'
+  slowest: ttft=694 any=604 reas_tok=37 cached=0 at 10:54:22Z q='How is full-duplex dialogue used in the Moshi pape'
+
+== gpt-oss-120b spread_short: 10 sent, 10 ok, statuses=[200]
+  first ANSWER token ms : n=10 p50=557 p90=742 p95=858 p99=951 max=974
+  first ANY token ms    : n=10 p50=464 p90=599 p95=745 p99=861 max=890
+  total ms              : n=10 p50=649 p90=825 p95=945 p99=1041 max=1065
+  reasoning gap ms (answer - any): n=10 p50=110 p95=149 max=149
+  answer decode tok/s (only calls with >50 ms of answer streaming): n=10 p50=571 p10=559 max=597
+  tokens in/out/reasoning mean: 314 / 105 / 54
+  prompt-cache hits: 1/10; first-answer-token median cached=716 uncached=550
+  slowest: ttft=974 any=890 reas_tok=41 cached=0 at 10:52:32Z q='How is the Mimi codec used in the Moshi paper?'
+  slowest: ttft=716 any=567 reas_tok=41 cached=256 at 10:53:09Z q='What does the Transformer paper say about the lear'
+
+== gpt-oss-20b spread_short: 40 sent, 40 ok, statuses=[200]
+  first ANSWER token ms : n=40 p50=490 p90=578 p95=640 p99=1204 max=1245
+  first ANY token ms    : n=40 p50=441 p90=533 p95=581 p99=1136 max=1185
+  total ms              : n=40 p50=536 p90=620 p95=675 p99=1243 max=1282
+  reasoning gap ms (answer - any): n=40 p50=64 p95=103 max=112
+  answer decode tok/s (only calls with >50 ms of answer streaming): n=7 p50=804 p10=536 max=911
+  tokens in/out/reasoning mean: 314 / 98 / 55
+  prompt-cache hits: 7/40; first-answer-token median cached=202 uncached=509
+  slowest: ttft=1245 any=1185 reas_tok=49 cached=256 at 10:50:06Z q='What are the limitations of label smoothing accord'
+  slowest: ttft=1140 any=1059 reas_tok=71 cached=0 at 10:50:30Z q='What does the H-Net paper say about two-stage hier'

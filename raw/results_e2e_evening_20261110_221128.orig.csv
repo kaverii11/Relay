@@ -1,0 +1,13 @@
+request_id,scenario,source,start_time,first_token_ms,total_ms,status,retries,tokens_in,tokens_out,retrieval_setting,answer_grade,service_start_ms,gave_up,degrade_level,model,calls,tokens_in_120b,tokens_out_120b,tokens_in_20b,tokens_out_20b,rerank_ms,reply_kind,draft_ready_ms,draft_sent_ms,arrival_pred_draft_sent_ms,arrival_busy_pred,busy_path,run_variant,standin_profile
+Q2,e2e,groq,2026-11-10T16:41:52.778+00:00,808.2,808.2,ok,0,319,146,w250_k6_rr1,,2.5,0,full,,1,0,0,319,146,144.4,refusal,,,750.2,0,,evening,
+Q3,e2e,groq,2026-11-10T16:42:23.593+00:00,2973.6,2973.6,ok,0,3175,380,w250_k6_rr1,,8.6,0,full,openai/gpt-oss-120b,3,2595,189,580,191,197.6,answer,1434.0,1434.5,750.6,0,,evening,
+Q5,e2e,groq,2026-11-10T16:42:56.578+00:00,5722.8,5722.8,ok,0,6102,518,w250_k6_rr1,,9.4,0,full,openai/gpt-oss-120b,4,5563,354,539,164,236.9,answer,600.5,601.4,750.6,0,,evening,
+Q6,e2e,groq,2026-11-10T16:43:32.311+00:00,2228.8,2228.8,ok,0,2762,349,w250_k6_rr1,,10.8,0,full,openai/gpt-oss-120b,3,2210,142,552,207,142.5,answer,766.7,767.6,750.6,0,,evening,
+Q17,e2e,groq,2026-11-10T16:44:04.548+00:00,2669.6,2669.6,ok,0,4170,490,w250_k6_rr1,,12.2,0,full,openai/gpt-oss-120b,4,3649,305,521,185,160.2,refusal,678.6,679.5,750.5,0,,evening,
+Q22,e2e,groq,2026-11-10T16:44:37.222+00:00,1335.4,1335.4,ok,0,2569,133,w250_k6_rr1,,9.5,0,full,openai/gpt-oss-120b,2,2237,53,332,80,167.2,refusal,700.2,700.8,750.5,0,,evening,
+Q24,e2e,groq,2026-11-10T16:45:08.559+00:00,3852.7,3852.7,ok,0,2448,338,w250_k6_rr1,,11.6,0,full,openai/gpt-oss-120b,3,1905,163,543,175,150.0,answer,917.4,918.2,750.3,0,,evening,
+Q28,e2e,groq,2026-11-10T16:45:42.419+00:00,2122.9,2122.9,ok,0,3339,402,w250_k6_rr1,,12.8,0,full,openai/gpt-oss-120b,3,2767,217,572,185,211.2,answer,843.3,844.2,750.6,0,,evening,
+Q30,e2e,groq,2026-11-10T16:46:14.549+00:00,3450.7,3450.7,ok,0,3084,430,w250_k6_rr1,,13.3,0,full,openai/gpt-oss-120b,3,2475,221,609,209,166.3,answer,824.3,825.3,750.6,0,,evening,
+Q33,e2e,groq,2026-11-10T16:46:48.003+00:00,645.0,645.0,ok,0,326,75,w250_k6_rr1,,14.8,0,full,,1,0,0,326,75,156.5,refusal,,,750.8,0,,evening,
+Q37,e2e,groq,2026-11-10T16:47:18.657+00:00,2614.3,2614.3,ok,0,3223,270,w250_k6_rr1,,12.5,0,full,openai/gpt-oss-120b,3,2685,127,538,143,177.8,answer,692.8,693.8,750.6,0,,evening,
+Q41,e2e,groq,2026-11-10T16:47:51.275+00:00,4812.7,4812.7,ok,0,5595,667,w250_k6_rr1,,8.4,0,full,openai/gpt-oss-120b,4,5033,454,562,213,216.3,answer,1505.8,1506.3,750.6,0,,evening,

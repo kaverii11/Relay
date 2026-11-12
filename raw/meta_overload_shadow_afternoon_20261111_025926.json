@@ -1,0 +1,97 @@
+{
+  "run": "overload_shadow_afternoon_20261111_025926",
+  "scenario": "overload",
+  "variant": "shadow",
+  "standin_profile": "afternoon",
+  "desc": "2c Poisson for 30 min (sustained overload)",
+  "rare_rate_override": null,
+  "seed": 1,
+  "setting": "w250_k6_rr1",
+  "policy": {
+    "system_deadline_ms": 8000,
+    "gate_threshold": 0.875,
+    "gate_input": "max",
+    "max_retries_per_question": 2,
+    "retry_budget_fraction": 0.1,
+    "retry_jitter": "jitter",
+    "backoff_base_ms": 250,
+    "call_timeout_short_s": 8.0,
+    "call_timeout_draft_s": 15.0,
+    "check_mode": "both",
+    "check_effort": "low",
+    "daily_reserve_fraction": 0.2,
+    "workers": 16,
+    "reasoning_effort": "low",
+    "cache": true,
+    "arrival_check": "shadow",
+    "learn_limits": true,
+    "extra": {}
+  },
+  "patience": {
+    "median_s": 15.0,
+    "sigma": 0.5
+  },
+  "n_arrivals": 222,
+  "started": "2026-11-10T21:29:34.006379+00:00",
+  "ceiling_per_min": 2.5,
+  "mix": {
+    "mode": "pool",
+    "pool": [
+      "eval/k_questions.csv",
+      "eval/variants_assistant.csv"
+    ],
+    "n_pool": 180,
+    "X": 0.25,
+    "Y": 0.5,
+    "hot_set": 3,
+    "pass_answerable": 0.8333333333333334,
+    "pass_unanswerable": 0.2878787878787879,
+    "draft_share_expected": 0.697,
+    "question_rate_per_min": [
+      7.174
+    ],
+    "draft_rate_per_min_expected": [
+      5.0
+    ],
+    "arrivals_by_kind": {
+      "fresh": 222,
+      "burst": 0,
+      "burst_repeat": 0,
+      "smoke": 0
+    },
+    "forced_repeats": 60,
+    "phase_minutes": 30
+  },
+  "finished": "2026-11-10T21:59:24.395126+00:00",
+  "standin_stats": {
+    "requests": 423,
+    "ok": 417,
+    "429": {},
+    "5xx": 6,
+    "stall": 2,
+    "drop": 0,
+    "rare": 14,
+    "rewrite_replayed": 64,
+    "rewrite_raw": 118,
+    "check_failed": 32,
+    "inflight": 0,
+    "peak_inflight": 4,
+    "remaining": {
+      "openai/gpt-oss-20b": {
+        "rpm": 30,
+        "itpm": 7000,
+        "tpm": 8000,
+        "rpd": 675,
+        "tpd": 1326
+      },
+      "openai/gpt-oss-120b": {
+        "rpm": 30,
+        "itpm": 7000,
+        "tpm": 8000,
+        "rpd": 942,
+        "tpd": 39793
+      }
+    }
+  },
+  "n_rows": 222
+}

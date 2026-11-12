@@ -1,0 +1,8 @@
+W1111 01:21:02.332000 13102 .venv/lib/python3.12/site-packages/torch/distributed/elastic/multiprocessing/redirects.py:35] NOTE: Redirects are currently not supported in MacOs.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/105 [00:00<?, ?it/s]Loading weights: 100%|██████████| 105/105 [00:00<00:00, 7770.38it/s]
+[minute_limit_halved_afternoon_20261111_012058] 70 arrivals over 29.8 min; draft share 0.70 -> questions/min [2.152], drafts/min [1.5]; forced repeats 0
+  t=  0.1min submitted 1/70 done=0
+  t= 11.1min submitted 26/70 done=25
+  t= 22.1min submitted 51/70 done=50
+[minute_limit_halved_afternoon_20261111_012058] done: 70 rows -> raw/results_minute_limit_halved_afternoon_20261111_012058.csv; stand-in {'requests': 174, 'ok': 154, '429': {'itpm': 18}, '5xx': 2, 'stall': 0, 'drop': 0, 'rare': 10, 'rewrite_replayed': 20, 'rewrite_raw': 50, 'check_failed': 12, 'inflight': 0, 'peak_inflight': 2, 'remaining': {'openai/gpt-oss-20b': {'rpm': 27, 'itpm': 1409, 'tpm': 5814, 'rpd': 895, 'tpd': 135431}, 'openai/gpt-oss-120b': {'rpm': 30, 'itpm': 3315, 'tpm': 8000, 'rpd': 989, 'tpd': 130767}}}

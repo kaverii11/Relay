@@ -1,0 +1,340 @@
+{
+  "Q57 x medium_norerank": {
+    "grade": "refused_wrongly  # both needed passages retrieved, drafter still refused (cf. B05)",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q57 x medium_k3_norerank": {
+    "grade": "refused_wrongly  # Q57; same as B28: both passages retrieved, drafter still refused",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q57 x medium_rerank": {
+    "grade": "wrong  # swaps papers: says Transformer uses AdamW+WSD (that's H-Net, C3); both checks passed",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q14 x medium_k3_norerank": {
+    "grade": "correct",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q14 x medium_rerank": {
+    "grade": "correct  # sentence before the quote says dropout applies to embedding + PE sums",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q14 x medium_norerank": {
+    "grade": "correct",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q43 x medium_k3_norerank": {
+    "grade": "refused_wrongly  # gate miss on Q43",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q43 x medium_rerank": {
+    "grade": "refused_wrongly  # Q43 gate miss",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q43 x medium_norerank": {
+    "grade": "refused_wrongly  # Q43 gate miss",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q12 x medium_k3_norerank": {
+    "grade": "refused_correctly  # drafter saw \"given target value\" and declined",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q12 x medium_rerank": {
+    "grade": "refused_correctly",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q12 x medium_norerank": {
+    "grade": "refused_correctly",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q26 x medium_rerank": {
+    "grade": "correct",
+    "label": "correct",
+    "drafts": {
+      "0": {
+        "note": "correct  # right claim; quote rewritten in LaTeX, so not verbatim",
+        "label": "correct"
+      }
+    }
+  },
+  "Q26 x medium_norerank": {
+    "grade": "correct",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q26 x medium_k3_norerank": {
+    "grade": "correct",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q40 x medium_norerank": {
+    "grade": "correct",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q40 x medium_k3_norerank": {
+    "grade": "correct",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q40 x medium_rerank": {
+    "grade": "correct",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q45 x medium_rerank": {
+    "grade": "refused_correctly  # gate refusal",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q45 x medium_norerank": {
+    "grade": "refused_correctly  # gate refusal",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q45 x medium_k3_norerank": {
+    "grade": "refused_correctly",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q49 x medium_k3_norerank": {
+    "grade": "refused_correctly  # gate passed, drafter refused",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q49 x medium_rerank": {
+    "grade": "refused_correctly",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q49 x medium_norerank": {
+    "grade": "refused_correctly",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q15 x medium_k3_norerank": {
+    "grade": "refused_wrongly  # unverified on answerable",
+    "label": "refused_wrongly",
+    "drafts": {
+      "0": {
+        "note": "wrong  # \"8\" is from the N (layers) rows of Table 3, not h; also a splice",
+        "label": "wrong"
+      },
+      "1": {
+        "note": "wrong  # same wrong row; rejected only by the 12-char rule",
+        "label": "wrong"
+      }
+    }
+  },
+  "Q15 x medium_rerank": {
+    "grade": "correct",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q15 x medium_norerank": {
+    "grade": "refused_wrongly  # Q15; the \u00a73.2.2 \"h = 8\" passage wasn't retrieved, so a retrieval miss",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q35 x medium_norerank": {
+    "grade": "correct",
+    "label": "correct",
+    "drafts": {
+      "0": {
+        "note": "correct  # right claim; failed only on \"...\" splice",
+        "label": "correct"
+      }
+    }
+  },
+  "Q35 x medium_k3_norerank": {
+    "grade": "correct  # passage C2 contains \"XAttn: Cross-attention pooling\" = Q43's answer, which the gate refused",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q35 x medium_rerank": {
+    "grade": "correct",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q48 x medium_norerank": {
+    "grade": "refused_correctly",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q48 x medium_k3_norerank": {
+    "grade": "refused_correctly",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q48 x medium_rerank": {
+    "grade": "refused_correctly",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q32 x medium_rerank": {
+    "grade": "wrong  # false premise; p.11 (N0=6) WAS retrieved this time, drafter still didn't correct it",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q32 x medium_norerank": {
+    "grade": "wrong  # false premise, plain refusal; p.11 (N0=6) not retrieved, so it couldn't correct",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q32 x medium_k3_norerank": {
+    "grade": "wrong  # false premise, plain refusal; p.11 (N0=6) not retrieved (same as B10)",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q7 x medium_k3_norerank": {
+    "grade": "refused_wrongly  # gate miss (empty rewrite)",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q7 x medium_rerank": {
+    "grade": "refused_wrongly  # gate miss (empty rewrite); Mistral row is in the next chunk",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q7 x medium_norerank": {
+    "grade": "refused_wrongly  # Q7 gate miss",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q34 x medium_k3_norerank": {
+    "grade": "refused_correctly",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q34 x medium_rerank": {
+    "grade": "refused_correctly",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q34 x medium_norerank": {
+    "grade": "refused_correctly  # C6 names Block Transformer only in related-work table; drafter correctly didn't treat that as an answer",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q8 x medium_k3_norerank": {
+    "grade": "correct",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q8 x medium_rerank": {
+    "grade": "correct",
+    "label": "correct",
+    "drafts": {
+      "0": {
+        "note": "correct  # right claim; failed only on \"...\" splice",
+        "label": "correct"
+      }
+    }
+  },
+  "Q8 x medium_norerank": {
+    "grade": "correct",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q47 x medium_norerank": {
+    "grade": "refused_correctly  # gate refusal",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q47 x medium_k3_norerank": {
+    "grade": "refused_correctly  # gate refusal",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q47 x medium_rerank": {
+    "grade": "refused_correctly  # gate refusal",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q18 x medium_norerank": {
+    "grade": "refused_wrongly  # unverified; drafts incomplete (only O(log_k n)); quote \"O(logk(n))\" IS in C2 but code check failed -> matcher bug?",
+    "label": "refused_wrongly",
+    "drafts": {
+      "0": {
+        "note": "wrong  # missing O(n/k)",
+        "label": "wrong"
+      },
+      "1": {
+        "note": "wrong  # missing O(n/k)",
+        "label": "wrong"
+      }
+    }
+  },
+  "Q18 x medium_k3_norerank": {
+    "grade": "wrong  # only O(log_k n), missing O(n/k)",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q18 x medium_rerank": {
+    "grade": "wrong  # only O(log_k n), missing O(n/k); same answer as B03 drafts but passed with a longer quote",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q25 x medium_k3_norerank": {
+    "grade": "correct  # cites p.16 (Chinese/code setup), not p.11; passage still states N0=3 for 2-stage",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q25 x medium_rerank": {
+    "grade": "correct",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q25 x medium_norerank": {
+    "grade": "correct",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q4 x medium_norerank": {
+    "grade": "correct  # same question as B14; here p.11 retrieved and two verbatim quotes -> right answer",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q4 x medium_k3_norerank": {
+    "grade": "correct",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q4 x medium_rerank": {
+    "grade": "wrong  # says semantic+acoustic tokens; answer is unquantized embeddings (p.11, not retrieved); BOTH checks passed",
+    "label": "wrong",
+    "drafts": {
+      "0": {
+        "note": "wrong  # same claim",
+        "label": "wrong"
+      }
+    }
+  },
+  "Q9 x medium_rerank": {
+    "grade": "refused_wrongly  # 42.2 is in C1 but table headers were in another chunk; drafter couldn't tell columns apart",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q9 x medium_norerank": {
+    "grade": "wrong  # 39.8 is the wrong column; 42.2 is block size 32; BOTH checks passed",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q9 x medium_k3_norerank": {
+    "grade": "wrong  # same wrong column as B26; both checks passed",
+    "label": "wrong",
+    "drafts": {}
+  }
+}

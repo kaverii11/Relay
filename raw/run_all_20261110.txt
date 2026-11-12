@@ -1,0 +1,25 @@
+W1110 23:29:52.089000 5454 .venv/lib/python3.12/site-packages/torch/distributed/elastic/multiprocessing/redirects.py:35] NOTE: Redirects are currently not supported in MacOs.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/105 [00:00<?, ?it/s]Loading weights: 100%|██████████| 105/105 [00:00<00:00, 10044.98it/s]ww250_k6_rr1: cutoff 0.875  pass answerable 0.83 (n=114)  pass unanswerable 0.29 (n=66)
+  k        n=  60  pass answerable 0.89  pass unanswerable 0.41
+  variant  n= 120  pass answerable 0.80  pass unanswerable 0.23
+-> load/mix.json
+=== 23:31:37 start steady --profile afternoon -> raw/log_steady_afternoon.txt
+=== 00:31:45 done  steady --profile afternoon: [steady_afternoon_20261110_233137] done: 141 rows -> raw/results_steady_afternoon_20261110_233137.csv; stand-in {'requests': 365, 'ok': 360, '429': {}, '5xx': 2, 'stall': 3, 'drop': 3, 'rare': 18, 're
+=== 00:31:45 start burst --profile afternoon -> raw/log_burst_afternoon.txt
+=== 00:50:59 done  burst --profile afternoon: [burst_afternoon_20261111_003145] done: 86 rows -> raw/results_burst_afternoon_20261111_003145.csv; stand-in {'requests': 149, 'ok': 145, '429': {}, '5xx': 4, 'stall': 1, 'drop': 0, 'rare': 9, 'rewrit
+=== 00:50:59 start overload --profile afternoon -> raw/log_overload_afternoon.txt
+=== 01:20:58 done  overload --profile afternoon: [overload_afternoon_20261111_005059] done: 222 rows -> raw/results_overload_afternoon_20261111_005059.csv; stand-in {'requests': 424, 'ok': 412, '429': {}, '5xx': 8, 'stall': 1, 'drop': 2, 'rare': 18,
+=== 01:20:58 start minute_limit_halved --profile afternoon -> raw/log_minute_limit_halved_afternoon.txt
+=== 01:50:59 done  minute_limit_halved --profile afternoon: [minute_limit_halved_afternoon_20261111_012058] done: 70 rows -> raw/results_minute_limit_halved_afternoon_20261111_012058.csv; stand-in {'requests': 174, 'ok': 154, '429': {'itpm': 18}, '5xx': 2, 'st
+=== 01:50:59 start daily_exhausted --profile afternoon -> raw/log_daily_exhausted_afternoon.txt
+=== 02:10:09 done  daily_exhausted --profile afternoon: [daily_exhausted_afternoon_20261111_015059] done: 46 rows -> raw/results_daily_exhausted_afternoon_20261111_015059.csv; stand-in {'requests': 25, 'ok': 24, '429': {}, '5xx': 1, 'stall': 1, 'drop': 0, 
+=== 02:10:09 start burst --profile evening -> raw/log_burst_evening.txt
+=== 02:29:27 done  burst --profile evening: [burst_evening_20261111_021009] done: 86 rows -> raw/results_burst_evening_20261111_021009.csv; stand-in {'requests': 142, 'ok': 137, '429': {}, '5xx': 1, 'stall': 1, 'drop': 0, 'rare': 62, 'rewrite_r
+=== 02:29:27 start overload --profile evening -> raw/log_overload_evening.txt
+=== 02:59:26 done  overload --profile evening: [overload_evening_20261111_022927] done: 222 rows -> raw/results_overload_evening_20261111_022927.csv; stand-in {'requests': 418, 'ok': 409, '429': {}, '5xx': 3, 'stall': 4, 'drop': 1, 'rare': 180, 'r
+=== 02:59:26 start overload --profile afternoon --arrival-check shadow --tag shadow -> raw/log_overload_afternoon_shadow.txt
+=== 03:29:25 done  overload --profile afternoon --arrival-check shadow --tag shadow: [overload_shadow_afternoon_20261111_025926] done: 222 rows -> raw/results_overload_shadow_afternoon_20261111_025926.csv; stand-in {'requests': 423, 'ok': 417, '429': {}, '5xx': 6, 'stall': 2, 'drop': 
+=== 03:29:25 start minute_limit_halved --profile afternoon --no-learn --tag nolearn -> raw/log_minute_limit_halved_afternoon_nolearn.txt
+=== 03:59:26 done  minute_limit_halved --profile afternoon --no-learn --tag nolearn: [minute_limit_halved_nolearn_afternoon_20261111_032925] done: 70 rows -> raw/results_minute_limit_halved_nolearn_afternoon_20261111_032925.csv; stand-in {'requests': 170, 'ok': 140, '429': {'itpm': 28
+=== 03:59:26 all done

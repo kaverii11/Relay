@@ -1,0 +1,96 @@
+W1111 12:45:27.326000 56307 .venv/lib/python3.12/site-packages/torch/distributed/elastic/multiprocessing/redirects.py:35] NOTE: Redirects are currently not supported in MacOs.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/105 [00:00<?, ?it/s]Loading weights: 100%|██████████| 105/105 [00:00<00:00, 6710.99it/s]
+[eval] run eval_day1_20261111_124523: target REAL Groq; day 1 of 2; settings ['medium_rerank', 'medium_norerank', 'medium_k3_norerank']; gates medium_rerank 0.875, medium_norerank 0.713, medium_k3_norerank 0.713 on max; deadline 8000 ms; patience 60 s; check_mode both; answer cache OFF
+  order (seed 42, all 20): Q57,Q14,Q43,Q12,Q26,Q40,Q45,Q49,Q15,Q35,Q48,Q32,Q7,Q34,Q8,Q47,Q18,Q25,Q4,Q9
+  today (20 questions x 3 settings = 60 pipeline runs), settings rotated per question (seed 42):
+    Q57  ans  [medium_norerank > medium_k3_norerank > medium_rerank]  Do the original Transformer and H-Net use the same optimizer and learning-rate schedule?
+    Q14  ans  [medium_k3_norerank > medium_rerank > medium_norerank]  What dropout rate is applied to the sums of the embeddings and positional encodings in the base mode
+    Q43  ans  [medium_k3_norerank > medium_rerank > medium_norerank]  In the ablation study for the chunking layer, what does "XAttn" stand for?
+    Q12  un   [medium_k3_norerank > medium_rerank > medium_norerank]  In zero-shot TTS, exactly what fraction of padding tokens do they target to control the speech rate?
+    Q26  ans  [medium_rerank > medium_norerank > medium_k3_norerank]  What specific mathematical function is used to create smooth interpolations between chunks during th
+    Q40  ans  [medium_norerank > medium_k3_norerank > medium_rerank]  How many sentence pairs are in the standard WMT 2014 English-German dataset used for training?
+    Q45  un   [medium_rerank > medium_norerank > medium_k3_norerank]  What is the Exact Match (EM) score of the Helium model on the SQuAD 2.0 benchmark?
+    Q49  un   [medium_k3_norerank > medium_rerank > medium_norerank]  How does the Transformer's self-attention mechanism perform on TPUv4 hardware accelerators?
+    Q15  ans  [medium_k3_norerank > medium_rerank > medium_norerank]  In their base model, how many attention heads do they use in total per layer?
+    Q35  ans  [medium_norerank > medium_k3_norerank > medium_rerank]  During the ablation of the chunking layer compression methods, which technique was the default Downs
+    Q48  un   [medium_norerank > medium_k3_norerank > medium_rerank]  What is the validation perplexity of the Transformer when evaluated on the GLUE benchmark?
+    Q32  un   [medium_rerank > medium_norerank > medium_k3_norerank]  Why did the authors choose a target compression ratio of N=8 for the one-stage H-Net model?
+    Q7   ans  [medium_k3_norerank > medium_rerank > medium_norerank]  How many points behind Mistral is their text backbone on MMLU?
+    Q34  un   [medium_k3_norerank > medium_rerank > medium_norerank]  How does the inference wall-clock speed of the 2-stage H-Net compare to the Block Transformer on the
+    Q8   ans  [medium_k3_norerank > medium_rerank > medium_norerank]  What MUSHRA score did the baseline tokenizer from Zhang get at 1.5kbps?
+    Q47  un   [medium_norerank > medium_k3_norerank > medium_rerank]  How does Moshi's text backbone integrate with the CLIP vision encoder for multimodal tasks?
+    Q18  ans  [medium_norerank > medium_k3_norerank > medium_rerank]  What is the maximum path length for a single convolutional layer with kernel width k < n?
+    Q25  ans  [medium_k3_norerank > medium_rerank > medium_norerank]  What is the downsampling target ratio for the first stage of their two-stage byte-level model?
+    Q4   ans  [medium_norerank > medium_k3_norerank > medium_rerank]  When they drop quantization during training for the audio codec, what exactly gets fed into the deco
+    Q9   ans  [medium_rerank > medium_norerank > medium_k3_norerank]  For the Moshi model after multi-stream instruct tuning, what is the exact MMLU score when weights ar
+  per run: understand (20b ~340+110) -> draft (120b, by setting: medium_rerank ~2325+250, medium_norerank ~2325+250, medium_k3_norerank ~1304+250) -> check (20b ~700+120); every gate assumed to pass
+  spacing after a run (2 x draft prompt vs ITPM 7000, min 10 s): medium_rerank 40 s, medium_norerank 40 s, medium_k3_norerank 22 s
+  requests: at the measured redraft rate 30% ~216, worst (every draft redrafted) 300; run cap 300
+  openai/gpt-oss-20b     at 30%: 138 req / ~ 90960 tok; worst 180 / ~125400; last 24 h  45363 -> after worst ~170763 of ceiling 170000 (OVER: the run would stop at a question boundary)
+  openai/gpt-oss-120b    at 30%:  78 req / ~174304 tok; worst 120 / ~268160; last 24 h  33344 -> after worst ~301504 of ceiling 170000 (OVER: the run would stop at a question boundary)
+  per-question ceiling check (worst case, all settings): 20b ~6270, 120b ~13408 tokens
+  forecast: if every draft is redrafted, the ceiling check stops the run after 10 of 20 questions (20b ~108063, 120b ~167424); at the measured 30% redraft rate after 15 (20b ~113583, 120b ~164072). The rest go on day 2.
+  pacing: ~39 min for all 20 (~29 min to the 30% stop)
+  1/60 Q57 medium_norerank: refusal  ok       first token 1336.6 ms (limiter wait 0.0 ms), calls 2, redraft n, 20b 318+87, 120b 2273+74, cached 0, full
+  2/60 Q57 medium_k3_norerank: refusal  ok       first token 1191.1 ms (limiter wait 0.0 ms), calls 2, redraft n, 20b 318+87, 120b 1064+61, cached 0, full
+  3/60 Q57 medium_rerank : answer   ok       first token 3116.0 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 1699+229, 120b 2310+468, cached 0, full
+  4/60 Q14 medium_k3_norerank: answer   ok       first token 2020.5 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 1038+220, 120b 1321+152, cached 0, full
+  5/60 Q14 medium_rerank : answer   ok       first token 2001.3 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 1038+220, 120b 2509+144, cached 0, full
+  6/60 Q14 medium_norerank: answer   ok       first token 2137.8 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 1044+220, 120b 2379+164, cached 0, full
+  7/60 Q43 medium_k3_norerank: refusal  ok       first token 259.6 ms (limiter wait 0.0 ms), calls 1, redraft n, 20b 323+62, 120b 0+0, cached 0, full
+  8/60 Q43 medium_rerank : refusal  ok       first token 680.6 ms (limiter wait 0.0 ms), calls 1, redraft n, 20b 323+62, 120b 0+0, cached 0, full
+  9/60 Q43 medium_norerank: refusal  ok       first token 670.5 ms (limiter wait 0.0 ms), calls 1, redraft n, 20b 323+62, 120b 0+0, cached 0, full
+  10/60 Q12 medium_k3_norerank: refusal  ok       first token 1244.1 ms (limiter wait 0.0 ms), calls 2, redraft n, 20b 323+99, 120b 1341+60, cached 0, full
+  11/60 Q12 medium_rerank : refusal  ok       first token 1576.5 ms (limiter wait 0.0 ms), calls 2, redraft n, 20b 323+99, 120b 2248+80, cached 256, full
+  12/60 Q12 medium_norerank: refusal  ok       first token 1433.0 ms (limiter wait 0.0 ms), calls 2, redraft n, 20b 323+99, 120b 2417+90, cached 256, full
+  13/60 Q26 medium_rerank : answer   ok       first token 4235.0 ms (limiter wait 0.0 ms), calls 4, redraft Y, 20b 1133+193, 120b 6242+635, cached 512, full
+  14/60 Q26 medium_norerank: answer   ok       first token 1952.8 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 1089+197, 120b 2725+230, cached 0, full
+  15/60 Q26 medium_k3_norerank: answer   ok       first token 2333.5 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 1087+306, 120b 1529+225, cached 256, full
+  16/60 Q40 medium_norerank: answer   ok       first token 1961.5 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 735+141, 120b 2450+134, cached 0, full
+  17/60 Q40 medium_k3_norerank: answer   ok       first token 2096.5 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 735+134, 120b 1118+131, cached 256, full
+  18/60 Q40 medium_rerank : answer   ok       first token 1942.5 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 733+160, 120b 2341+130, cached 0, full
+  19/60 Q45 medium_rerank : refusal  ok       first token 826.4 ms (limiter wait 0.0 ms), calls 1, redraft n, 20b 327+82, 120b 0+0, cached 256, full
+  20/60 Q45 medium_norerank: refusal  ok       first token 599.7 ms (limiter wait 0.0 ms), calls 1, redraft n, 20b 327+91, 120b 0+0, cached 0, full
+  21/60 Q45 medium_k3_norerank: refusal  ok       first token 711.3 ms (limiter wait 0.0 ms), calls 1, redraft n, 20b 327+82, 120b 0+0, cached 0, full
+  22/60 Q49 medium_k3_norerank: refusal  ok       first token 1457.2 ms (limiter wait 0.0 ms), calls 2, redraft n, 20b 320+86, 120b 1135+50, cached 256, full
+  23/60 Q49 medium_rerank : refusal  ok       first token 1259.0 ms (limiter wait 0.0 ms), calls 2, redraft n, 20b 320+88, 120b 2097+50, cached 0, full
+  24/60 Q49 medium_norerank: refusal  ok       first token 1206.2 ms (limiter wait 0.0 ms), calls 2, redraft n, 20b 320+86, 120b 1858+50, cached 0, full
+  25/60 Q15 medium_k3_norerank: unverified ok       first token 2749.4 ms (limiter wait 0.0 ms), calls 3, redraft Y, 20b 319+90, 120b 2361+522, cached 0, full
+  26/60 Q15 medium_rerank : answer   ok       first token 2142.3 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 926+162, 120b 2201+149, cached 0, full
+  27/60 Q15 medium_norerank: refusal  ok       first token 1611.7 ms (limiter wait 0.0 ms), calls 2, redraft n, 20b 319+90, 120b 2157+324, cached 0, full
+  28/60 Q35 medium_norerank: answer   ok       first token 3380.0 ms (limiter wait 0.0 ms), calls 4, redraft Y, 20b 1052+204, 120b 5535+424, cached 256, full
+  29/60 Q35 medium_k3_norerank: answer   ok       first token 2384.4 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 1056+188, 120b 1443+182, cached 0, full
+  30/60 Q35 medium_rerank : answer   ok       first token 2447.5 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 1053+190, 120b 3021+176, cached 256, full
+  31/60 Q48 medium_norerank: refusal  ok       first token 1333.2 ms (limiter wait 0.0 ms), calls 2, redraft n, 20b 319+59, 120b 2055+46, cached 256, full
+  32/60 Q48 medium_k3_norerank: refusal  ok       first token 897.7 ms (limiter wait 0.0 ms), calls 2, redraft n, 20b 319+59, 120b 1109+50, cached 256, full
+  33/60 Q48 medium_rerank : refusal  ok       first token 1084.7 ms (limiter wait 0.0 ms), calls 2, redraft n, 20b 319+59, 120b 2326+52, cached 512, full
+  34/60 Q32 medium_rerank : refusal  ok       first token 1314.7 ms (limiter wait 0.0 ms), calls 2, redraft n, 20b 323+116, 120b 2547+52, cached 256, full
+  35/60 Q32 medium_norerank: refusal  ok       first token 1588.0 ms (limiter wait 0.0 ms), calls 2, redraft n, 20b 323+116, 120b 2863+62, cached 256, full
+  36/60 Q32 medium_k3_norerank: refusal  ok       first token 1274.3 ms (limiter wait 0.0 ms), calls 2, redraft n, 20b 323+138, 120b 1778+57, cached 512, full
+  37/60 Q7 medium_k3_norerank: refusal  ok       first token 726.1 ms (limiter wait 0.0 ms), calls 1, redraft n, 20b 318+86, 120b 0+0, cached 256, full
+  38/60 Q7 medium_rerank : refusal  ok       first token 679.7 ms (limiter wait 0.0 ms), calls 1, redraft n, 20b 318+106, 120b 0+0, cached 0, full
+  39/60 Q7 medium_norerank: refusal  ok       first token 690.3 ms (limiter wait 0.0 ms), calls 1, redraft n, 20b 318+72, 120b 0+0, cached 0, full
+  40/60 Q34 medium_k3_norerank: refusal  ok       first token 1312.0 ms (limiter wait 0.0 ms), calls 2, redraft n, 20b 328+97, 120b 1378+53, cached 0, full
+  41/60 Q34 medium_rerank : refusal  ok       first token 1354.3 ms (limiter wait 0.0 ms), calls 2, redraft n, 20b 328+97, 120b 2521+53, cached 256, full
+  42/60 Q34 medium_norerank: refusal  ok       first token 1308.9 ms (limiter wait 0.0 ms), calls 2, redraft n, 20b 328+97, 120b 2425+51, cached 512, full
+  43/60 Q8 medium_k3_norerank: answer   ok       first token 3595.8 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 1052+171, 120b 1642+205, cached 256, full
+  44/60 Q8 medium_rerank : answer   ok       first token 4777.7 ms (limiter wait 0.0 ms), calls 4, redraft Y, 20b 1050+136, 120b 5734+449, cached 768, full
+  45/60 Q8 medium_norerank: answer   ok       first token 2987.0 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 1052+163, 120b 3096+206, cached 512, full
+  46/60 Q47 medium_norerank: refusal  ok       first token 326.8 ms (limiter wait 0.0 ms), calls 1, redraft n, 20b 321+76, 120b 0+0, cached 256, full
+  47/60 Q47 medium_k3_norerank: refusal  ok       first token 409.8 ms (limiter wait 0.0 ms), calls 1, redraft n, 20b 321+77, 120b 0+0, cached 0, full
+  48/60 Q47 medium_rerank : refusal  ok       first token 687.8 ms (limiter wait 0.0 ms), calls 1, redraft n, 20b 321+76, 120b 0+0, cached 256, full
+  49/60 Q18 medium_norerank: unverified ok       first token 3126.1 ms (limiter wait 0.0 ms), calls 3, redraft Y, 20b 321+63, 120b 3827+320, cached 256, full
+  50/60 Q18 medium_k3_norerank: answer   ok       first token 2255.6 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 833+149, 120b 1275+189, cached 256, full
+  51/60 Q18 medium_rerank : answer   ok       first token 2656.6 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 832+153, 120b 1951+158, cached 256, full
+  52/60 Q25 medium_k3_norerank: answer   ok       first token 2811.5 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 990+151, 120b 1602+190, cached 256, full
+  53/60 Q25 medium_rerank : answer   ok       first token 2224.1 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 1027+166, 120b 2884+191, cached 512, full
+  54/60 Q25 medium_norerank: answer   ok       first token 2446.0 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 1020+149, 120b 2944+186, cached 256, full
+  55/60 Q4 medium_norerank: answer   ok       first token 2459.3 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 983+161, 120b 2859+206, cached 512, full
+  56/60 Q4 medium_k3_norerank: answer   ok       first token 1657.6 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 983+160, 120b 1454+206, cached 0, full
+  57/60 Q4 medium_rerank : answer   ok       first token 4263.5 ms (limiter wait 0.0 ms), calls 4, redraft Y, 20b 1055+264, 120b 5931+797, cached 256, full
+  58/60 Q9 medium_rerank : refusal  ok       first token 1382.7 ms (limiter wait 0.0 ms), calls 2, redraft n, 20b 344+121, 120b 2954+86, cached 0, full
+  59/60 Q9 medium_norerank: answer   ok       first token 3587.5 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 1147+239, 120b 2943+224, cached 256, full
+  60/60 Q9 medium_k3_norerank: answer   ok       first token 3559.6 ms (limiter wait 0.0 ms), calls 3, redraft n, 20b 1147+244, 120b 1706+309, cached 768, full
+[eval] eval_day1_20261111_124523: {"n": 60, "answers": 27, "refusals": 31, "busy": 0, "unverified": 2, "completed": ["Q57", "Q14", "Q43", "Q12", "Q26", "Q40", "Q45", "Q49", "Q15", "Q35", "Q48", "Q32", "Q7", "Q34", "Q8", "Q47", "Q18", "Q25", "Q4", "Q9"], "by_setting": {"medium_rerank": 20, "medium_norerank": 20, "medium_k3_norerank": 20}, "limiter_wait_ms_total": 0, "tokens_cached_total": 11264, "requests_sent": 141, "stopped": null}
+  -> raw/results_eval_day1_20261111_124523.csv, raw/reading_eval_day1_20261111_124523.md (grade by hand)

@@ -1,0 +1,246 @@
+{
+  "run": "v1v2_20261112_133034",
+  "seed": 7,
+  "key": {
+    "B01": {
+      "question": "Q67",
+      "setting": "chosen"
+    },
+    "B02": {
+      "question": "Q80",
+      "setting": "chosen"
+    },
+    "B03": {
+      "question": "Q66",
+      "setting": "chosen_v2"
+    },
+    "B04": {
+      "question": "Q78",
+      "setting": "chosen_v2"
+    },
+    "B05": {
+      "question": "Q81",
+      "setting": "chosen_v3a"
+    },
+    "B06": {
+      "question": "Q82",
+      "setting": "chosen_v3a"
+    },
+    "B07": {
+      "question": "Q75",
+      "setting": "chosen"
+    },
+    "B08": {
+      "question": "Q68",
+      "setting": "chosen_v2"
+    },
+    "B09": {
+      "question": "Q63",
+      "setting": "chosen"
+    },
+    "B10": {
+      "question": "Q71",
+      "setting": "chosen_v2"
+    },
+    "B11": {
+      "question": "Q73",
+      "setting": "chosen"
+    },
+    "B12": {
+      "question": "Q66",
+      "setting": "chosen_v3a"
+    },
+    "B13": {
+      "question": "Q65",
+      "setting": "chosen_v3a"
+    },
+    "B14": {
+      "question": "Q74",
+      "setting": "chosen_v3a"
+    },
+    "B15": {
+      "question": "Q84",
+      "setting": "chosen_v3a"
+    },
+    "B16": {
+      "question": "Q82",
+      "setting": "chosen"
+    },
+    "B17": {
+      "question": "Q72",
+      "setting": "chosen"
+    },
+    "B18": {
+      "question": "Q78",
+      "setting": "chosen"
+    },
+    "B19": {
+      "question": "Q72",
+      "setting": "chosen_v2"
+    },
+    "B20": {
+      "question": "Q80",
+      "setting": "chosen_v3a"
+    },
+    "B21": {
+      "question": "Q71",
+      "setting": "chosen"
+    },
+    "B22": {
+      "question": "Q75",
+      "setting": "chosen_v2"
+    },
+    "B23": {
+      "question": "Q74",
+      "setting": "chosen_v2"
+    },
+    "B24": {
+      "question": "Q79",
+      "setting": "chosen"
+    },
+    "B25": {
+      "question": "Q80",
+      "setting": "chosen_v2"
+    },
+    "B26": {
+      "question": "Q84",
+      "setting": "chosen_v2"
+    },
+    "B27": {
+      "question": "Q83",
+      "setting": "chosen_v3a"
+    },
+    "B28": {
+      "question": "Q81",
+      "setting": "chosen_v2"
+    },
+    "B29": {
+      "question": "Q68",
+      "setting": "chosen_v3a"
+    },
+    "B30": {
+      "question": "Q63",
+      "setting": "chosen_v2"
+    },
+    "B31": {
+      "question": "Q77",
+      "setting": "chosen_v3a"
+    },
+    "B32": {
+      "question": "Q76",
+      "setting": "chosen"
+    },
+    "B33": {
+      "question": "Q84",
+      "setting": "chosen"
+    },
+    "B34": {
+      "question": "Q77",
+      "setting": "chosen"
+    },
+    "B35": {
+      "question": "Q67",
+      "setting": "chosen_v3a"
+    },
+    "B36": {
+      "question": "Q65",
+      "setting": "chosen_v2"
+    },
+    "B37": {
+      "question": "Q81",
+      "setting": "chosen"
+    },
+    "B38": {
+      "question": "Q79",
+      "setting": "chosen_v2"
+    },
+    "B39": {
+      "question": "Q76",
+      "setting": "chosen_v3a"
+    },
+    "B40": {
+      "question": "Q79",
+      "setting": "chosen_v3a"
+    },
+    "B41": {
+      "question": "Q68",
+      "setting": "chosen"
+    },
+    "B42": {
+      "question": "Q83",
+      "setting": "chosen"
+    },
+    "B43": {
+      "question": "Q73",
+      "setting": "chosen_v3a"
+    },
+    "B44": {
+      "question": "Q74",
+      "setting": "chosen"
+    },
+    "B45": {
+      "question": "Q64",
+      "setting": "chosen_v3a"
+    },
+    "B46": {
+      "question": "Q63",
+      "setting": "chosen_v3a"
+    },
+    "B47": {
+      "question": "Q67",
+      "setting": "chosen_v2"
+    },
+    "B48": {
+      "question": "Q75",
+      "setting": "chosen_v3a"
+    },
+    "B49": {
+      "question": "Q83",
+      "setting": "chosen_v2"
+    },
+    "B50": {
+      "question": "Q77",
+      "setting": "chosen_v2"
+    },
+    "B51": {
+      "question": "Q72",
+      "setting": "chosen_v3a"
+    },
+    "B52": {
+      "question": "Q65",
+      "setting": "chosen"
+    },
+    "B53": {
+      "question": "Q76",
+      "setting": "chosen_v2"
+    },
+    "B54": {
+      "question": "Q82",
+      "setting": "chosen_v2"
+    },
+    "B55": {
+      "question": "Q64",
+      "setting": "chosen_v2"
+    },
+    "B56": {
+      "question": "Q64",
+      "setting": "chosen"
+    },
+    "B57": {
+      "question": "Q78",
+      "setting": "chosen_v3a"
+    },
+    "B58": {
+      "question": "Q73",
+      "setting": "chosen_v2"
+    },
+    "B59": {
+      "question": "Q66",
+      "setting": "chosen"
+    },
+    "B60": {
+      "question": "Q71",
+      "setting": "chosen_v3a"
+    }
+  }
+}

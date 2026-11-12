@@ -1,0 +1,5 @@
+request_id,scenario,source,start_time,first_token_ms,total_ms,status,retries,tokens_in,tokens_out,retrieval_setting,answer_grade,service_start_ms,gave_up,degrade_level,model,calls,tokens_in_120b,tokens_out_120b,tokens_in_20b,tokens_out_20b,rerank_ms,reply_kind,draft_ready_ms,draft_sent_ms,arrival_pred_draft_sent_ms,arrival_busy_pred,busy_path,run_variant,standin_profile
+Q6,e2e,stand-in,2026-11-10T14:01:36.713+00:00,3462.2,3462.2,ok,1,2580,288,w250_k6_rr1,,0.5,0,full,openai/gpt-oss-120b,4,2175,133,405,155,130.3,answer,521.2,521.2,750.1,0,,smoke,
+Q10,e2e,stand-in,2026-11-10T14:01:41.181+00:00,2083.8,2083.8,ok,0,3028,277,w250_k6_rr1,,2.0,0,full,openai/gpt-oss-120b,3,2617,116,411,161,146.9,answer,661.0,661.0,750.3,0,,smoke,
+Q24,e2e,stand-in,2026-11-10T14:01:44.265+00:00,1763.6,1763.6,ok,0,2246,349,w250_k6_rr1,,1.0,0,full,openai/gpt-oss-120b,3,1826,152,420,197,144.4,answer,689.2,689.3,750.3,0,,smoke,
+Q28,e2e,stand-in,2026-11-10T14:01:47.031+00:00,2746.2,2746.2,ok,0,1912,270,w250_k6_rr1,,2.3,0,fewer_chunks,openai/gpt-oss-120b,3,1501,127,411,143,139.0,answer,578.2,578.2,750.5,0,,smoke,

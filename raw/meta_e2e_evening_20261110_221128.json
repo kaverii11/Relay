@@ -1,0 +1,111 @@
+{
+  "run": "e2e_evening_20261110_221128",
+  "tag": "evening",
+  "source": "groq",
+  "setting": "w250_k6_rr1",
+  "policy": {
+    "system_deadline_ms": 10000,
+    "gate_threshold": 0.875,
+    "gate_input": "max",
+    "max_retries_per_question": 2,
+    "retry_budget_fraction": 0.1,
+    "retry_jitter": "jitter",
+    "backoff_base_ms": 250,
+    "call_timeout_short_s": 8.0,
+    "call_timeout_draft_s": 15.0,
+    "check_mode": "both",
+    "check_effort": "low",
+    "daily_reserve_fraction": 0.2,
+    "workers": 16,
+    "reasoning_effort": "low",
+    "cache": true,
+    "arrival_check": "on",
+    "learn_limits": true,
+    "extra": {}
+  },
+  "patience_s": 60.0,
+  "gap_s": 30.0,
+  "cap": 60,
+  "seed": 7,
+  "extra": 2,
+  "ids": null,
+  "questions": [
+    "Q2",
+    "Q3",
+    "Q5",
+    "Q6",
+    "Q17",
+    "Q22",
+    "Q24",
+    "Q28",
+    "Q30",
+    "Q33",
+    "Q37",
+    "Q41"
+  ],
+  "predicted_gate": {
+    "Q2": -1.59,
+    "Q3": 5.662,
+    "Q5": 2.352,
+    "Q6": 2.928,
+    "Q17": 6.857,
+    "Q22": 3.127,
+    "Q24": 5.736,
+    "Q28": 3.742,
+    "Q30": 6.153,
+    "Q33": 0.802,
+    "Q37": 3.34,
+    "Q41": 5.632
+  },
+  "started": "2026-11-10T16:41:52+00:00",
+  "ledger_before": {
+    "openai/gpt-oss-20b": {
+      "requests": 45,
+      "in": 14465,
+      "out": 4769,
+      "tokens": 19234
+    },
+    "openai/gpt-oss-120b": {
+      "requests": 0,
+      "in": 0,
+      "out": 0,
+      "tokens": 0
+    }
+  },
+  "finished": "2026-11-10T16:47:56+00:00",
+  "summary": {
+    "n": 12,
+    "answers": 8,
+    "refusals": 4,
+    "busy": 0,
+    "none": 0,
+    "first_token_ms": {
+      "p50": 2641.95,
+      "p95": 5722.8,
+      "max": 5722.8
+    },
+    "total_ms": {
+      "p50": 2641.95,
+      "p95": 5722.8,
+      "max": 5722.8
+    },
+    "retries": 0,
+    "requests_sent": 34,
+    "limiter_wait_s_total": 0.0,
+    "stopped": null
+  },
+  "ledger_after": {
+    "openai/gpt-oss-20b": {
+      "requests": 66,
+      "in": 20458,
+      "out": 6742,
+      "tokens": 27200
+    },
+    "openai/gpt-oss-120b": {
+      "requests": 13,
+      "in": 31119,
+      "out": 2225,
+      "tokens": 33344
+    }
+  }
+}

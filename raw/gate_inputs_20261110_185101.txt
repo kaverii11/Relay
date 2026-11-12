@@ -1,0 +1,60 @@
+Tuning: answerable n=25, unanswerable-but-pass n=8, refuse n=7; setting w250_k6_rr1
+
+| input | highest refuse | lowest answerable above it | gap | K-rule cutoff | answerable refused | unanswerable-pass refused (types) | of which false premise (= wrong) | refuse passed | graded errors (answerable + false premise refused) | probes on the wrong side |
+|---|---|---|---|---|---|---|---|---|---|---|
+| raw | -0.867 (Q50) | -0.700 (Q42) | 0.167 | **-0.783** | 3/25: Q2, Q16, Q28 | 3/8: Q46 ((Not Reported)), Q60 ((Not Reported); expertise trap), Q21 ((Number Not Reported)) | 0 | 0/7 | 3 | wp2_Q46 |
+| rewrite | 0.354 (Q51) | 0.648 (Q58) | 0.293 | **0.501** | 2/25: Q16, Q2 | 3/8: Q46 ((Not Reported)), Q60 ((Not Reported); expertise trap), Q21 ((Number Not Reported)) | 0 | 0/7 | 2 | wp2_Q46, wp3_Q52 |
+| max | 0.354 (Q51) | 1.395 (Q42) | 1.041 | **0.875** | 2/25: Q16, Q2 | 4/8: Q46 ((Not Reported)), Q60 ((Not Reported); expertise trap), Q21 ((Number Not Reported)), Q33 ((Number Not Reported)) | 0 | 0/7 | 2 | wp2_Q46 |
+
+Per question (tuning), sorted by rewrite score
+| id | answerable | gate_expected | type | raw | rewrite | max |
+|---|---|---|---|---|---|---|
+| Q55 | no | refuse | Unanswerable (Not in papers) | -9.805 | -9.805 | -9.805 |
+| Q46 | no | pass | Unanswerable (Not Reported) | -4.233 | -3.452 | -3.452 |
+| Q44 | no | refuse | Unanswerable (Not in papers) | -2.831 | -3.199 | -2.831 |
+| Q50 | no | refuse | Unanswerable (Not in papers) | -0.867 | -3.046 | -0.867 |
+| Q16 | yes | pass | vague | -2.605 | -2.765 | -2.605 |
+| Q60 | no | pass | Unanswerable (Not Reported); expertise trap | -4.107 | -2.576 | -2.576 |
+| Q53 | no | refuse | Unanswerable (Not in papers) | -3.307 | -2.140 | -2.140 |
+| Q2 | yes | pass | reworded; cross-paper collision | -3.912 | -1.590 | -1.590 |
+| Q54 | no | refuse | Unanswerable (Not in papers) | -3.320 | -0.989 | -0.989 |
+| Q21 | no | pass | Unanswerable (Number Not Reported) | -1.510 | -0.202 | -0.202 |
+| Q52 | no | refuse | Unanswerable (Not in papers) | -2.764 | 0.031 | 0.031 |
+| Q51 | no | refuse | Unanswerable (Not in papers); cross-paper collision | -0.894 | 0.354 | 0.354 |
+| Q58 | yes | pass | cross-paper (needs two papers) | 2.614 | 0.648 | 2.614 |
+| Q33 | no | pass | Unanswerable (Number Not Reported) | -0.252 | 0.802 | 0.802 |
+| Q56 | yes | pass | cross-paper (needs two papers) | 2.728 | 0.968 | 2.728 |
+| Q22 | no | pass | Unanswerable (Comparison Not Made) | 3.127 | 1.350 | 3.127 |
+| Q42 | yes | pass | reworded | -0.700 | 1.395 | 1.395 |
+| Q1 | yes | pass | reworded | 2.618 | 1.664 | 2.618 |
+| Q10 | no | pass | Unanswerable (False Premise) | -0.120 | 1.911 | 1.911 |
+| Q5 | yes | pass | reworded | 0.418 | 2.352 | 2.352 |
+| Q27 | yes | pass | verbatim | 3.258 | 2.684 | 3.258 |
+| Q6 | yes | pass | reworded | -0.326 | 2.928 | 2.928 |
+| Q41 | yes | pass | reworded | 5.632 | 3.058 | 5.632 |
+| Q37 | yes | pass | reworded | 3.340 | 3.289 | 3.340 |
+| Q28 | yes | pass | reworded | -1.222 | 3.742 | 3.742 |
+| Q36 | yes | pass | verbatim | 3.867 | 3.867 | 3.867 |
+| Q38 | yes | pass | reworded | 4.598 | 3.965 | 4.598 |
+| Q20 | no | pass | Unanswerable (False Premise) | 2.972 | 4.941 | 4.941 |
+| Q31 | yes | pass | reworded | 4.395 | 5.223 | 5.223 |
+| Q24 | yes | pass | verbatim | 5.736 | 5.422 | 5.736 |
+| Q39 | yes | pass | reworded | 5.903 | 5.515 | 5.903 |
+| Q23 | yes | pass | reworded; cross-paper collision | 3.678 | 5.555 | 5.555 |
+| Q3 | yes | pass | verbatim | 4.012 | 5.662 | 5.662 |
+| Q17 | yes | pass | reworded | 6.857 | 6.011 | 6.857 |
+| Q59 | yes | pass | vague | 0.934 | 6.133 | 6.133 |
+| Q30 | yes | pass | reworded | 5.734 | 6.153 | 6.153 |
+| Q13 | yes | pass | reworded | 5.959 | 6.353 | 6.353 |
+| Q29 | yes | pass | reworded; cross-paper collision | 4.796 | 6.528 | 6.528 |
+| Q19 | yes | pass | reworded | 5.030 | 6.648 | 6.648 |
+| Q11 | no | pass | Unanswerable (Comparison Not Made) | 3.527 | 6.784 | 6.784 |
+
+Wording probes (assistant-written; not tuning)
+| id | gate_expected | raw | rewrite | max |
+|---|---|---|---|---|
+| wp0_Q44 | refuse | -2.117 | -3.199 | -2.117 |
+| wp2_Q46 | pass | -4.695 | -3.452 | -3.452 |
+| wp3_Q52 | refuse | -3.721 | 0.560 | 0.560 |
+| wp4_Q58 | pass | 1.848 | 0.648 | 1.848 |
+| wp1_Q55 | refuse | -10.224 | -10.224 | -10.224 |

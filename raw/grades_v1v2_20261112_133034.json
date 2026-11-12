@@ -1,0 +1,320 @@
+{
+  "Q84 x chosen_v2": {
+    "grade": "wrong Chinese/code datasets, not the 100B-token FineWeb-Edu subset (2507 \u00a73 p.11)",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q84 x chosen_v3a": {
+    "grade": "wrong gave the Chinese/code datasets (\u00a73.2); main H-Net LMs use the 100B-token FineWeb-Edu subset (2507 \u00a73 p.11)",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q84 x chosen": {
+    "grade": "wrong Chinese/code datasets, not the 100B-token FineWeb-Edu subset (2507 \u00a73 p.11)",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q68 x chosen_v3a": {
+    "grade": "refused_wrongly unverified on answerable",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q68 x chosen": {
+    "grade": "correct 81.0\u00b11.3 vs 58.8\u00b11.8 (2410 Table 4 p.23-24)",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q68 x chosen_v2": {
+    "grade": "refused_wrongly unverified on answerable (81.0\u00b11.3 vs 58.8\u00b11.8, 2410 Table 4)",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q79 x chosen_v3a": {
+    "grade": "refused_correctly not in papers",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q79 x chosen": {
+    "grade": "refused_correctly not in papers (no dynamic chunking on WMT En-Fr)",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q79 x chosen_v2": {
+    "grade": "refused_correctly not in papers",
+    "label": "refused_correctly",
+    "drafts": {}
+  },
+  "Q67 x chosen_v3a": {
+    "grade": "correct 0.7032 vs 0.7404",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q67 x chosen": {
+    "grade": "correct 0.7032 vs 0.7404 (2507 Table 4 p.17)",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q67 x chosen_v2": {
+    "grade": "correct 0.7032 vs 0.7404",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q74 x chosen": {
+    "grade": "refused_wrongly answerable (App. E)",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q74 x chosen_v2": {
+    "grade": "refused_wrongly answerable (App. E)",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q74 x chosen_v3a": {
+    "grade": "refused_wrongly answerable: Mistral crime_kidnap 26.86 (2410 App. E p.61)",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q78 x chosen_v2": {
+    "grade": "wrong false premise (codec lr is 8\u00b710^-4, 2410 \u00a73.3.1 p.11; hours not reported); plain refusal = wrong (K's Q78 rule)",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q78 x chosen_v3a": {
+    "grade": "wrong false premise; plain refusal = wrong (K's Q78 rule)",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q78 x chosen": {
+    "grade": "wrong false premise; plain refusal = wrong (K's Q78 rule)",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q80 x chosen": {
+    "grade": "wrong Helium's AdamW + cosine schedule (2410 \u00a74.4) given as the Transformer's; 1706 \u00a75.3 was C1 (Adam, warmup 4000, inverse sqrt)",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q80 x chosen_v2": {
+    "grade": "wrong Helium's AdamW + cosine (2410 \u00a74.4), not the Transformer's Adam + warmup/inverse sqrt (1706 \u00a75.3 p.7)",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q80 x chosen_v3a": {
+    "grade": "wrong Helium's AdamW + cosine (2410 \u00a74.4), not the Transformer's Adam + warmup/inverse sqrt (1706 \u00a75.3 p.7)",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q83 x chosen_v3a": {
+    "grade": "correct 7B (2410 Table 1 caption p.8)",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q83 x chosen": {
+    "grade": "correct 7B",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q83 x chosen_v2": {
+    "grade": "correct 7B; note: first citation is the baselines' size sentence (\u00a75.1 p.22), second (Table 1 caption p.8) supports",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q71 x chosen_v3a": {
+    "grade": "refused_wrongly answerable (Table 8)",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q71 x chosen": {
+    "grade": "refused_wrongly answerable (Table 8)",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q71 x chosen_v2": {
+    "grade": "refused_wrongly answerable: 21.0 without IM vs 62.3 full (2410 Table 8 p.29-30)",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q77 x chosen_v2": {
+    "grade": "correct 2048 vs 512, four times",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q77 x chosen_v3a": {
+    "grade": "refused_wrongly unverified on answerable (d_ff 2048 = 4 x d_model 512, 1706 \u00a73.3 p.5)",
+    "label": "refused_wrongly",
+    "drafts": {
+      "0": {
+        "note": "correct 2048 = 4 x 512; the check rejected the derived 'four times'",
+        "label": "correct"
+      },
+      "1": {
+        "note": "correct same claim; sticky rule failed it without a check",
+        "label": "correct"
+      }
+    }
+  },
+  "Q77 x chosen": {
+    "grade": "correct 2048 vs 512, four times (1706 \u00a73.3 p.5)",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q82 x chosen_v2": {
+    "grade": "correct 160 ms",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q82 x chosen_v3a": {
+    "grade": "correct 160 ms (2410 abstract, \u00a75.3)",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q82 x chosen": {
+    "grade": "correct 160 ms",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q75 x chosen": {
+    "grade": "correct 24 kHz, 12.5 Hz (2410 Table 3 row, \u00a75.1 p.23)",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q75 x chosen_v2": {
+    "grade": "correct 24 kHz, 12.5 Hz",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q75 x chosen_v3a": {
+    "grade": "correct 24 kHz, 12.5 Hz",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q64 x chosen_v3a": {
+    "grade": "wrong 39.0 is the Robustness Score; average HellaSwag is 38.0 (2507 Table 3 p.14)",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q64 x chosen": {
+    "grade": "wrong 32.1 is the Drop column; average is 38.0 (2507 Table 3 p.14)",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q64 x chosen_v2": {
+    "grade": "wrong 39.0 is the Robustness Score; average is 38.0 (2507 Table 3 p.14)",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q76 x chosen_v3a": {
+    "grade": "refused_wrongly unverified on answerable (SWA, window 1024)",
+    "label": "refused_wrongly",
+    "drafts": {
+      "0": {
+        "note": "wrong SWA right, window size (1024) said not given",
+        "label": "wrong"
+      },
+      "1": {
+        "note": "wrong same as draft 0",
+        "label": "wrong"
+      }
+    }
+  },
+  "Q76 x chosen": {
+    "grade": "wrong two-part: SWA right, window size (1024, 2507 \u00a73 p.11) said not given",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q76 x chosen_v2": {
+    "grade": "wrong two-part: SWA right, window size (1024, 2507 \u00a73 p.11) said not given",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q65 x chosen_v3a": {
+    "grade": "wrong two-part question: gave block size 32 (52.97) only, not per-channel (49.29)",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q65 x chosen": {
+    "grade": "correct 49.29 per-channel, 52.97 block size 32 (2410 Table 10 p.33)",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q65 x chosen_v2": {
+    "grade": "wrong two-part question: gave block size 32 (52.97) only, not per-channel (49.29)",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q81 x chosen_v2": {
+    "grade": "correct 6 layers",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q81 x chosen_v3a": {
+    "grade": "correct 6 layers (1706 \u00a73.1 p.3)",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q81 x chosen": {
+    "grade": "correct 6 layers",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q72 x chosen_v2": {
+    "grade": "correct 35.7 (2410 Table 11a, block 32)",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q72 x chosen_v3a": {
+    "grade": "correct 35.7",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q72 x chosen": {
+    "grade": "wrong gives 26.1 (that is block size 256) and 35.7 for block size 32 without choosing (2410 Table 11a p.33)",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q73 x chosen_v3a": {
+    "grade": "refused_wrongly answerable (App. E)",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q73 x chosen": {
+    "grade": "refused_wrongly answerable: Falcon substance_cannabis 56.17 (2410 App. E p.61)",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q73 x chosen_v2": {
+    "grade": "refused_wrongly answerable (App. E)",
+    "label": "refused_wrongly",
+    "drafts": {}
+  },
+  "Q63 x chosen_v2": {
+    "grade": "correct 7.0",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q63 x chosen_v3a": {
+    "grade": "correct 7.0",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q63 x chosen": {
+    "grade": "correct 7.0 (2507 Table 1)",
+    "label": "correct",
+    "drafts": {}
+  },
+  "Q66 x chosen": {
+    "grade": "wrong false premise; plain refusal = wrong by the \u00a76 false-premise rule",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q66 x chosen_v2": {
+    "grade": "wrong false premise (Helium 55.9 > MPT 46.5); plain refusal = wrong by the \u00a76 false-premise rule",
+    "label": "wrong",
+    "drafts": {}
+  },
+  "Q66 x chosen_v3a": {
+    "grade": "correct corrects the premise: Helium 55.9 vs MPT 46.5, cited (2410 Table 2 \u00a75.1)",
+    "label": "correct",
+    "drafts": {}
+  }
+}

@@ -1,0 +1,370 @@
+{
+  "results": [
+    {
+      "id": "Q3",
+      "round": 0,
+      "corrupt": false,
+      "note": "",
+      "old": {
+        "ok": true,
+        "why": "",
+        "stage": "pass"
+      },
+      "code_ok": true,
+      "code_why": "",
+      "model_ok": true,
+      "model_why": "",
+      "tokens_in": 727,
+      "tokens_out": 49,
+      "work_ms": 507.4,
+      "pass": true
+    },
+    {
+      "id": "Q5",
+      "round": 0,
+      "corrupt": false,
+      "note": "",
+      "old": {
+        "ok": false,
+        "why": "Quote for C1 is not word-for-word in that passage.",
+        "stage": "code"
+      },
+      "code_ok": false,
+      "code_why": "Quote for C1 is not word-for-word in that passage: \"we reduce competition between RVQ levels by using a depthwis\"",
+      "model_ok": null,
+      "model_why": "",
+      "tokens_in": 0,
+      "tokens_out": 0,
+      "work_ms": null,
+      "pass": false
+    },
+    {
+      "id": "Q5",
+      "round": 1,
+      "corrupt": false,
+      "note": "",
+      "old": {
+        "ok": true,
+        "why": "",
+        "stage": "pass"
+      },
+      "code_ok": true,
+      "code_why": "",
+      "model_ok": true,
+      "model_why": "",
+      "tokens_in": 586,
+      "tokens_out": 67,
+      "work_ms": 336.0,
+      "pass": true
+    },
+    {
+      "id": "Q6",
+      "round": 0,
+      "corrupt": false,
+      "note": "",
+      "old": {
+        "ok": true,
+        "why": "",
+        "stage": "pass"
+      },
+      "code_ok": true,
+      "code_why": "",
+      "model_ok": true,
+      "model_why": "",
+      "tokens_in": 480,
+      "tokens_out": 80,
+      "work_ms": 539.3,
+      "pass": true
+    },
+    {
+      "id": "Q17",
+      "round": 0,
+      "corrupt": false,
+      "note": "",
+      "old": {
+        "ok": false,
+        "why": "The quoted statement does not mention the use of 8 GPUs; it only states the training duration of 12 hours, so the claim about 8 GPUs is not supported.",
+        "stage": "model"
+      },
+      "code_ok": true,
+      "code_why": "",
+      "model_ok": true,
+      "model_why": "",
+      "tokens_in": 366,
+      "tokens_out": 48,
+      "work_ms": 791.6,
+      "pass": true
+    },
+    {
+      "id": "Q17",
+      "round": 1,
+      "corrupt": false,
+      "note": "",
+      "old": {
+        "ok": false,
+        "why": "Quote for C1 is not word-for-word in that passage.",
+        "stage": "code"
+      },
+      "code_ok": false,
+      "code_why": "Quote for C1 is not word-for-word in that passage: \"We trained our models on one machine with 8 NVIDIA P100 GPUs\"",
+      "model_ok": null,
+      "model_why": "",
+      "tokens_in": 0,
+      "tokens_out": 0,
+      "work_ms": null,
+      "pass": false
+    },
+    {
+      "id": "Q22",
+      "round": 0,
+      "corrupt": false,
+      "note": "",
+      "old": {
+        "ok": null,
+        "why": "",
+        "stage": "?"
+      },
+      "code_ok": false,
+      "code_why": "drafter said not_in_papers: no check in production, skipped",
+      "model_ok": null,
+      "model_why": "",
+      "tokens_in": 0,
+      "tokens_out": 0,
+      "work_ms": null,
+      "pass": false
+    },
+    {
+      "id": "Q24",
+      "round": 0,
+      "corrupt": false,
+      "note": "",
+      "old": {
+        "ok": true,
+        "why": "",
+        "stage": "pass"
+      },
+      "code_ok": true,
+      "code_why": "",
+      "model_ok": true,
+      "model_why": "",
+      "tokens_in": 430,
+      "tokens_out": 84,
+      "work_ms": 485.0,
+      "pass": true
+    },
+    {
+      "id": "Q28",
+      "round": 0,
+      "corrupt": false,
+      "note": "",
+      "old": {
+        "ok": true,
+        "why": "",
+        "stage": "pass"
+      },
+      "code_ok": true,
+      "code_why": "",
+      "model_ok": false,
+      "model_why": "The cited passage does not state that the STE is used in the dechunking layer or that it enables gradient flow through discrete chunking decisions; it only mentions that STE contributes to training stability and final performance.",
+      "tokens_in": 774,
+      "tokens_out": 187,
+      "work_ms": 686.6,
+      "pass": false
+    },
+    {
+      "id": "Q30",
+      "round": 0,
+      "corrupt": false,
+      "note": "",
+      "old": {
+        "ok": true,
+        "why": "",
+        "stage": "pass"
+      },
+      "code_ok": true,
+      "code_why": "",
+      "model_ok": true,
+      "model_why": "",
+      "tokens_in": 1128,
+      "tokens_out": 65,
+      "work_ms": 532.2,
+      "pass": true
+    },
+    {
+      "id": "Q37",
+      "round": 0,
+      "corrupt": false,
+      "note": "",
+      "old": {
+        "ok": true,
+        "why": "",
+        "stage": "pass"
+      },
+      "code_ok": true,
+      "code_why": "",
+      "model_ok": true,
+      "model_why": "",
+      "tokens_in": 632,
+      "tokens_out": 83,
+      "work_ms": 371.8,
+      "pass": true
+    },
+    {
+      "id": "Q41",
+      "round": 0,
+      "corrupt": false,
+      "note": "",
+      "old": {
+        "ok": false,
+        "why": "Quote for C4 is not word-for-word in that passage.",
+        "stage": "code"
+      },
+      "code_ok": false,
+      "code_why": "Quote for C4 is not word-for-word in that passage: \"On Chinese and code, we use 46B token subset from FineWeb-Ed\"",
+      "model_ok": null,
+      "model_why": "",
+      "tokens_in": 0,
+      "tokens_out": 0,
+      "work_ms": null,
+      "pass": false
+    },
+    {
+      "id": "Q41",
+      "round": 1,
+      "corrupt": false,
+      "note": "",
+      "old": {
+        "ok": true,
+        "why": "",
+        "stage": "pass"
+      },
+      "code_ok": true,
+      "code_why": "",
+      "model_ok": true,
+      "model_why": "",
+      "tokens_in": 699,
+      "tokens_out": 90,
+      "work_ms": 687.8,
+      "pass": true
+    },
+    {
+      "id": "Q17",
+      "round": 0,
+      "corrupt": true,
+      "note": "K (2026-11-10), Opposite claim (wrong GPU count & training time): Changed GPU count from 8 to 16 and base model training time from 12 hours to 3.5 days (opposite claim). Cited quote in \u00a75.2 remains unchanged. Expected verdict: REJECT",
+      "old": {
+        "ok": false,
+        "why": "The quoted statement does not mention the use of 8 GPUs; it only states the training duration of 12 hours, so the claim about 8 GPUs is not supported.",
+        "stage": "model"
+      },
+      "code_ok": true,
+      "code_why": "",
+      "model_ok": false,
+      "model_why": "The cited passage states that the base models were trained on 8 NVIDIA P100 GPUs for 100,000 steps (12 hours), not 300,000 steps or 3.5 days. The 300,000 steps and 3.5 days refer to the big models, not the base models. Additionally, the passage specifies 8 GPUs, not 16.",
+      "tokens_in": 368,
+      "tokens_out": 173,
+      "work_ms": 689.2,
+      "pass": false
+    },
+    {
+      "id": "Q5",
+      "round": 1,
+      "corrupt": true,
+      "note": "K (2026-11-10), Wrong number from same passage: Reversed claim from unshared to shared weights and borrowed '16' from attention heads in the same passage. Quote in \u00a73.4.1 remains unchanged. Expected verdict: REJECT",
+      "old": {
+        "ok": true,
+        "why": "",
+        "stage": "pass"
+      },
+      "code_ok": true,
+      "code_why": "",
+      "model_ok": false,
+      "model_why": "The cited passage explicitly states that each RVQ level is predicted by its own set of weights in the Depth Transformer, indicating that weights are not shared across levels.",
+      "tokens_in": 574,
+      "tokens_out": 102,
+      "work_ms": 560.4,
+      "pass": false
+    },
+    {
+      "id": "Q37",
+      "round": 0,
+      "corrupt": true,
+      "note": "K (2026-11-10), Swapped values: Swapped quantizer count (Q=8) and codebook size (NA=2048). Both numbers appear together in \u00a73.3.1 passage. Quote remains unchanged. Expected verdict: REJECT",
+      "old": {
+        "ok": true,
+        "why": "",
+        "stage": "pass"
+      },
+      "code_ok": true,
+      "code_why": "",
+      "model_ok": false,
+      "model_why": "The cited passage states that there are 8 quantizers, each with a codebook size of 2048, which contradicts the claim that there are 2048 quantizers each with a codebook size of 8.",
+      "tokens_in": 631,
+      "tokens_out": 117,
+      "work_ms": 516.8,
+      "pass": false
+    },
+    {
+      "id": "Q30",
+      "round": 0,
+      "corrupt": true,
+      "note": "K (2026-11-10), Swapped values: Swapped Mamba-2 (20) and Transformer (7) layer counts. Both numbers appear together in \u00a73.3 passage. Quote remains unchanged. Expected verdict: REJECT",
+      "old": {
+        "ok": true,
+        "why": "",
+        "stage": "pass"
+      },
+      "code_ok": true,
+      "code_why": "",
+      "model_ok": false,
+      "model_why": "The cited passages state that the hybrid model contains 20 Mamba\u20112 layers and 7 Transformer layers interleaved in a 3:1 ratio, which is the opposite of the claim (7 Mamba\u20112 and 20 Transformer layers in a 1:3 ratio).",
+      "tokens_in": 1117,
+      "tokens_out": 170,
+      "work_ms": 628.0,
+      "pass": false
+    }
+  ],
+  "summary": {
+    "n_drafts": 17,
+    "real_round0_n": 10,
+    "real_round0_failed": [
+      "Q5",
+      "Q28",
+      "Q41"
+    ],
+    "check_fail_rate": 0.3,
+    "check_fail_rate_label": "round-0 check failures (code or model) / real draft paths, n=10",
+    "corrupt_n": 4,
+    "corrupt_rejected": 4,
+    "check_tokens_in": [
+      727,
+      586,
+      480,
+      366,
+      430,
+      774,
+      1128,
+      632,
+      699,
+      368,
+      574,
+      631,
+      1117
+    ],
+    "check_work_ms": [
+      507.4,
+      336.0,
+      539.3,
+      791.6,
+      485.0,
+      686.6,
+      532.2,
+      371.8,
+      687.8,
+      689.2,
+      560.4,
+      516.8,
+      628.0
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+W1111 02:10:13.387000 16289 .venv/lib/python3.12/site-packages/torch/distributed/elastic/multiprocessing/redirects.py:35] NOTE: Redirects are currently not supported in MacOs.
+Loading weights:   0%|          | 0/105 [00:00<?, ?it/s]Loading weights: 100%|██████████| 105/105 [00:00<00:00, 8965.11it/s]
+[burst_evening_20261111_021009] 86 arrivals over 19.0 min; draft share 0.70 -> questions/min [2.152], drafts/min [1.5]; forced repeats 0
+  t=  0.1min submitted 1/86 done=0
+  t=  5.2min submitted 26/86 done=24
+  t=  5.4min submitted 51/86 done=49
+  t= 12.6min submitted 76/86 done=74
+[burst_evening_20261111_021009] done: 86 rows -> raw/results_burst_evening_20261111_021009.csv; stand-in {'requests': 142, 'ok': 137, '429': {}, '5xx': 1, 'stall': 1, 'drop': 0, 'rare': 62, 'rewrite_replayed': 21, 'rewrite_raw': 33, 'check_failed': 13, 'inflight': 0, 'peak_inflight': 4, 'remaining': {'openai/gpt-oss-20b': {'rpm': 30, 'itpm': 7000, 'tpm': 8000, 'rpd': 911, 'tpd': 149581}, 'openai/gpt-oss-120b': {'rpm': 29, 'itpm': 3044, 'tpm': 4006, 'rpd': 973, 'tpd': 105514}}}

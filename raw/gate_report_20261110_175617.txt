@@ -1,0 +1,101 @@
+Gate scores (w250_k6_rr1); eval set held out
+| id | set | answerable | gate_expected | raw score | rewritten score | change | question -> rewrite |
+|---|---|---|---|---|---|---|---|
+| Q1 | tuning | yes | pass | 2.62 | 1.66 | -0.95 | What's the average human conversation response time that they compare their model's latency against? -> average human conversation response time latency comparison |
+| Q10 | tuning | no | pass | -0.12 | 1.91 | +2.03 | Why do they use a flatness threshold of 1e-4 to detect repetitive text artifacts? -> flatness threshold 1e-4 repetitive text artifacts |
+| Q11 | tuning | no | pass | 3.53 | 6.78 | +3.26 | Which watermarking method has a better detection score under pink noise: Audioseal or the Kirchenbauer approach? -> watermarking detection score pink noise Audioseal Kirchenbauer |
+| Q13 | tuning | yes | pass | 5.96 | 6.35 | +0.39 | What is the inner-layer dimensionality of the position-wise feed-forward networks in the base model? -> inner-layer dimensionality position-wise feed-forward networks base model |
+| Q16 | tuning | yes | pass | -2.61 | -2.76 | -0.16 | What optimizer is used and what is the value of epsilon? -> optimizer epsilon value transformer |
+| Q17 | tuning | yes | pass | 6.86 | 6.01 | -0.85 | How many hours did it take to train their base translation model on 8 GPUs? -> training time base translation model 8 GPUs hours |
+| Q19 | tuning | yes | pass | 5.03 | 6.65 | +1.62 | Why is a scaling factor applied to the dot products in the attention function? -> attention scaling factor dot product sqrt(d_k) |
+| Q2 | tuning | yes | pass | -3.91 | -1.59 | +2.32 | How does their text backbone's tokenizer avoid losing information with its 32k vocabulary? -> tokenizer 32k vocabulary information loss Moshi |
+| Q20 | tuning | no | pass | 2.97 | 4.94 | +1.97 | Why does the model use an embedding size of 1024 for the English-to-German base translation task? -> embedding size 1024 English-to-German base translation |
+| Q21 | tuning | no | pass | -1.51 | -0.20 | +1.31 | What is the exact temperature used for sampling during the English-to-German translation inference? -> temperature sampling English-to-German translation inference |
+| Q22 | tuning | no | pass | 3.13 | 1.35 | -1.78 | Does the Transformer's self-attention layer process sequences faster in wall-clock time compared to ByteNet's convolutional layers on 8 P100 GPUs? -> Transformer self-attention wall-clock time ByteNet convolution 8 P100 GPUs |
+| Q23 | tuning | yes | pass | 3.68 | 5.55 | +1.88 | Which model architecture variant performs English constituency parsing using semi-supervised training, and what F1 score does it achieve? -> English constituency parsing semi-supervised training F1 |
+| Q24 | tuning | yes | pass | 5.74 | 5.42 | -0.31 | In what way do the two linear transformations in the feed-forward network share parameters? -> feed-forward network linear transformations share parameters transformer |
+| Q27 | tuning | yes | pass | 3.26 | 2.68 | -0.57 | What is the exact MMLU 5-shot accuracy of the distilled H-Net (1-stage) model? -> distilled H-Net 1-stage MMLU 5-shot accuracy |
+| Q28 | tuning | yes | pass | -1.22 | 3.74 | +4.96 | Why is a straight-through estimator used during the dechunking process? -> straight-through estimator dechunking dynamic chunking |
+| Q29 | tuning | yes | pass | 4.80 | 6.53 | +1.73 | For the models matched to the GPT-3 Large scale, how many bytes of training data does it take before the two-stage model overtakes the token-based Transformer baseline on validation bits-per-byte? -> GPT-3 Large scale two-stage model overtakes token-based Transformer baseline validation bits-per-byte bytes of training data |
+| Q3 | tuning | yes | pass | 4.01 | 5.66 | +1.65 | What are the exact striding factors used in the four convolutional blocks of Mimi's encoder before the final 1D convolution? -> Mimi encoder convolutional blocks striding factors |
+| Q30 | tuning | yes | pass | 5.73 | 6.15 | +0.42 | When comparing the hybrid main network to a pure Transformer main network for the two-stage model, what specific layer configuration did the hybrid use? -> hybrid main network two-stage model layer configuration |
+| Q31 | tuning | yes | pass | 4.40 | 5.22 | +0.83 | In the Chinese language modeling experiments, which tokenizer is used for the baseline Transformer since the GPT-2 one compresses poorly? -> Chinese language modeling baseline Transformer tokenizer GPT-2 compresses poorly |
+| Q33 | tuning | no | pass | -0.25 | 0.80 | +1.05 | What is the exact percentage of training time overhead introduced by the dynamic chunking mechanism compared to a standard isotropic Transformer? -> dynamic chunking training time overhead percentage compared to standard Transformer |
+| Q36 | tuning | yes | pass | 3.87 | 3.87 | +0.00 | In the HG38 DNA modeling experiments, what was the exact learning rate used for the modules operating at the base-pair resolution? -> In the HG38 DNA modeling experiments, what was the exact learning rate used for the modules operating at the base-pair resolution? |
+| Q37 | tuning | yes | pass | 3.34 | 3.29 | -0.05 | How many quantizers does Moshi's audio codec (Mimi) use for each 12.5 Hz frame? -> Moshi Mimi codec quantizers per 12.5 Hz frame |
+| Q38 | tuning | yes | pass | 4.60 | 3.96 | -0.63 | What dataset was used to fine-tune the Helium text model for conversational capabilities? -> Helium fine-tuning dataset conversational capabilities |
+| Q39 | tuning | yes | pass | 5.90 | 5.51 | -0.39 | What is the dropout rate used for the big Transformer model during the English-to-French translation task? -> dropout rate big Transformer English-to-French translation |
+| Q41 | tuning | yes | pass | 5.63 | 3.06 | -2.57 | What dataset was used to train the Chinese language models? -> Chinese language model dataset used in Moshi |
+| Q42 | tuning | yes | pass | -0.70 | 1.40 | +2.09 | Which specific optimization scheduler was used alongside AdamW for training H-Net? -> H-Net AdamW optimization scheduler |
+| Q44 | tuning | no | refuse | -2.83 | -3.20 | -0.37 | How much does the API access for the Moshi conversational AI cost per 1,000 tokens? -> Moshi API cost per 1,000 tokens |
+| Q46 | tuning | no | pass | -4.23 | -3.45 | +0.78 | Which cloud provider hosted the deployment for Moshi's live voice assistant demo? -> Moshi live voice assistant demo cloud provider deployment |
+| Q5 | tuning | yes | pass | 0.42 | 2.35 | +1.93 | Do they share weights across the levels in the smaller transformer that processes the audio codes? -> smaller transformer audio codes weight sharing across levels |
+| Q50 | tuning | no | refuse | -0.87 | -3.05 | -2.18 | What exact version of the PyTorch framework was used to implement the tensor2tensor codebase? -> tensor2tensor PyTorch version |
+| Q51 | tuning | no | refuse | -0.89 | 0.35 | +1.25 | What are the latency improvements when deploying the base Transformer model on mobile devices using quantization? -> quantization latency mobile base transformer |
+| Q52 | tuning | no | refuse | -2.76 | 0.03 | +2.80 | How does H-Net perform when analyzing financial time-series data like stock prices? -> H-Net dynamic chunking financial time series stock prices |
+| Q53 | tuning | no | refuse | -3.31 | -2.14 | +1.17 | What were the human preference win rates for H-Net during RLHF training? -> H-Net human preference win rates RLHF training |
+| Q54 | tuning | no | refuse | -3.32 | -0.99 | +2.33 | Which commercial products currently integrate the H-Net architecture for production workloads? -> H-Net architecture commercial products production workloads |
+| Q55 | tuning | no | refuse | -9.81 | -9.81 | +0.00 | What is the capital of France? -> What is the capital of France? |
+| Q56 | tuning | yes | pass | 2.73 | 0.97 | -1.76 | Which scores higher on 5-shot MMLU: Moshi's Helium text model or the distilled H-Net (1-stage)? -> Moshi Helium 5-shot MMLU score H-Net distilled 1-stage |
+| Q58 | tuning | yes | pass | 2.61 | 0.65 | -1.97 | What positional encoding does Moshi's Helium text model use, and how is that different from the original Transformer's? -> Moshi Helium positional encoding Transformer positional encoding difference |
+| Q59 | tuning | yes | pass | 0.93 | 6.13 | +5.20 | What learning rate did they use? -> transformer learning rate schedule |
+| Q6 | tuning | yes | pass | -0.33 | 2.93 | +3.25 | What do they use to get the Fisher dataset up to the right sample rate? -> Fisher dataset sample rate Moshi |
+| Q60 | tuning | no | pass | -4.11 | -2.58 | +1.53 | What response latency does Moshi get when one GPU is serving many concurrent callers? -> response latency GPU concurrent callers Moshi |
+| wp0_Q44 | wording_probe | no | refuse | -2.12 | -3.20 | -1.08 | Quick question: how much does the API access for the Moshi conversational AI cost per 1,000 tokens? -> Moshi API cost per 1,000 tokens |
+| wp1_Q55 | wording_probe | no | refuse | -10.22 | -10.22 | +0.00 | Hey, sorry if this is basic: what is the capital of France? -> Hey, sorry if this is basic: what is the capital of France? |
+| wp2_Q46 | wording_probe | no | pass | -4.70 | -3.45 | +1.24 | Question for you: which cloud provider hosted the deployment for Moshi's live voice assistant demo? -> Moshi live voice assistant demo cloud provider deployment |
+| wp3_Q52 | wording_probe | no | refuse | -3.72 | 0.56 | +4.28 | I was reading the papers and wondered: how does H-Net perform when analyzing financial time-series data like stock prices? -> H-Net dynamic chunking financial time series stock prices performance |
+| wp4_Q58 | wording_probe | yes | pass | 1.85 | 0.65 | -1.20 | Not sure where to look for this: what positional encoding does Moshi's Helium text model use, and how is that different from the original Transformer's? -> Moshi Helium positional encoding Transformer positional encoding difference |
+
+Wording probes vs their parent (assistant-written casual framings)
+| probe | parent | parent raw | probe raw | parent rewritten | probe rewritten |
+|---|---|---|---|---|---|
+| wp0_Q44 | Q44 | -2.83 | -2.12 | -3.20 | -3.20 |
+| wp2_Q46 | Q46 | -4.23 | -4.70 | -3.45 | -3.45 |
+| wp3_Q52 | Q52 | -2.76 | -3.72 | 0.03 | 0.56 |
+| wp4_Q58 | Q58 | 2.61 | 1.85 | 0.65 | 0.65 |
+| wp1_Q55 | Q55 | -9.81 | -10.22 | -9.81 | -10.22 |
+
+Cutoff sweep on TUNING questions, rewritten query, by gate_expected (pass n=33, refuse n=7)
+| cutoff (= an observed score) | should-pass passed | should-refuse refused | wrong refusals | wrong passes |
+|---|---|---|---|---|
+| -9.81 | 33/33 | 0/7 | 0 | 7 |
+| -3.45 | 32/33 | 1/7 | 1 | 6 |
+| -3.20 | 32/33 | 1/7 | 1 | 6 |
+| -3.05 | 32/33 | 2/7 | 1 | 5 |
+| -2.76 | 31/33 | 3/7 | 2 | 4 |
+| -2.58 | 31/33 | 3/7 | 2 | 4 |
+| -2.14 | 30/33 | 4/7 | 3 | 3 |
+| -1.59 | 29/33 | 4/7 | 4 | 3 |
+| -0.99 | 29/33 | 4/7 | 4 | 3 |
+| -0.20 | 28/33 | 5/7 | 5 | 2 |
+| 0.03 | 28/33 | 5/7 | 5 | 2 |
+| 0.35 | 28/33 | 6/7 | 5 | 1 |
+| 0.65 | 27/33 | 7/7 | 6 | 0 |
+| 0.80 | 27/33 | 7/7 | 6 | 0 |
+| 0.97 | 25/33 | 7/7 | 8 | 0 |
+| 1.35 | 25/33 | 7/7 | 8 | 0 |
+| 1.40 | 23/33 | 7/7 | 10 | 0 |
+| 1.66 | 23/33 | 7/7 | 10 | 0 |
+| 1.91 | 22/33 | 7/7 | 11 | 0 |
+| 2.35 | 21/33 | 7/7 | 12 | 0 |
+| 2.68 | 20/33 | 7/7 | 13 | 0 |
+| 2.93 | 18/33 | 7/7 | 15 | 0 |
+| 3.06 | 17/33 | 7/7 | 16 | 0 |
+| 3.29 | 16/33 | 7/7 | 17 | 0 |
+| 3.74 | 16/33 | 7/7 | 17 | 0 |
+| 3.87 | 14/33 | 7/7 | 19 | 0 |
+| 3.96 | 14/33 | 7/7 | 19 | 0 |
+| 4.94 | 13/33 | 7/7 | 20 | 0 |
+| 5.22 | 12/33 | 7/7 | 21 | 0 |
+| 5.42 | 11/33 | 7/7 | 22 | 0 |
+| 5.51 | 10/33 | 7/7 | 23 | 0 |
+| 5.55 | 9/33 | 7/7 | 24 | 0 |
+| 5.66 | 8/33 | 7/7 | 25 | 0 |
+| 6.01 | 7/33 | 7/7 | 26 | 0 |
+| 6.13 | 6/33 | 7/7 | 27 | 0 |
+| 6.15 | 5/33 | 7/7 | 28 | 0 |
+| 6.35 | 4/33 | 7/7 | 29 | 0 |
+| 6.53 | 2/33 | 7/7 | 31 | 0 |
+| 6.65 | 1/33 | 7/7 | 32 | 0 |
+| 6.78 | 1/33 | 7/7 | 32 | 0 |

@@ -1,0 +1,91 @@
+[replay v2 check] 39 drafts: 35 graded eval drafts (27 passed the v1 code check, 8 failed it) + 4 corrupted; 39 calls on openai/gpt-oss-20b (REAL Groq), effort low, prompt v2, passages = the v2 pieces
+  passages not found in v2 (fell back to the stored text): 0; drafts whose passages include a table piece (prefix): 33
+  grades: correct 24, wrong 11, wrong (corrupted, expected REJECT) 4
+  est tokens: ~29787 in + ~4680 out (in per call p50 ~739); 1 call / 8 s (~5 min)
+  openai/gpt-oss-20b: last 24 h 91534 tok -> after ~126001 of ceiling 170000; run cap 41; no 120b calls
+    B05 d0                 grade wrong              v1 code True  v1 model True  in ~1550
+    B45 d0                 grade correct            v1 code True  v1 model True  in ~725
+    B29 d0                 grade correct            v1 code False v1 model None  in ~886
+    B29 d1                 grade correct            v1 code True  v1 model True  in ~873
+    B48 d0                 grade correct            v1 code True  v1 model True  in ~504
+    B13 d0                 grade correct            v1 code True  v1 model True  in ~705
+    B43 d0                 grade correct            v1 code True  v1 model True  in ~844
+    B27 d0                 grade correct            v1 code False v1 model None  in ~644
+    B27 d1                 grade correct            v1 code True  v1 model True  in ~645
+    B12 d0                 grade wrong              v1 code True  v1 model True  in ~658
+    B35 d0                 grade correct            v1 code True  v1 model True  in ~769
+    B14 d0                 grade wrong              v1 code False v1 model None  in ~823
+    B14 d1                 grade wrong              v1 code True  v1 model True  in ~835
+    B55 d0                 grade correct            v1 code True  v1 model True  in ~729
+    B08 d0                 grade correct            v1 code True  v1 model True  in ~845
+    B22 d0                 grade correct            v1 code True  v1 model True  in ~507
+    B58 d0                 grade correct            v1 code False v1 model None  in ~850
+    B58 d1                 grade correct            v1 code True  v1 model True  in ~843
+    B49 d0                 grade correct            v1 code True  v1 model True  in ~646
+    B03 d0                 grade wrong              v1 code False v1 model None  in ~655
+    B03 d1                 grade wrong              v1 code False v1 model None  in ~652
+    B47 d0                 grade correct            v1 code True  v1 model True  in ~761
+    B23 d0                 grade correct            v1 code True  v1 model True  in ~791
+    B26 d0                 grade wrong              v1 code True  v1 model True  in ~820
+    B56 d0                 grade correct            v1 code True  v1 model True  in ~725
+    B41 d0                 grade correct            v1 code True  v1 model True  in ~843
+    B07 d0                 grade correct            v1 code True  v1 model True  in ~507
+    B52 d0                 grade wrong              v1 code False v1 model None  in ~729
+    B52 d1                 grade wrong              v1 code False v1 model None  in ~724
+    B11 d0                 grade correct            v1 code True  v1 model True  in ~854
+    B42 d0                 grade correct            v1 code True  v1 model True  in ~646
+    B59 d0                 grade wrong              v1 code True  v1 model True  in ~660
+    B01 d0                 grade correct            v1 code True  v1 model True  in ~739
+    B44 d0                 grade correct            v1 code True  v1 model True  in ~792
+    B33 d0                 grade wrong              v1 code True  v1 model True  in ~820
+    CORRUPT Q17 r0         grade wrong (corrupted, expected REJECT) v1 code None  v1 model None  in ~430
+    CORRUPT Q5 r1          grade wrong (corrupted, expected REJECT) v1 code None  v1 model None  in ~743
+    CORRUPT Q37 r0         grade wrong (corrupted, expected REJECT) v1 code None  v1 model None  in ~729
+    CORRUPT Q30 r0         grade wrong (corrupted, expected REJECT) v1 code None  v1 model None  in ~1286
+  B05 d0                 wrong              v2 model REJECT  checker did not confirm support
+  B45 d0                 correct            v2 model PASS  
+  B29 d0                 correct            v2 model PASS  
+  B29 d1                 correct            v2 model PASS  
+  B48 d0                 correct            v2 model PASS  
+  B13 d0                 correct            v2 model PASS  
+  B43 d0                 correct            v2 model PASS  
+  B27 d0                 correct            v2 model PASS  
+  B27 d1                 correct            v2 model PASS  
+  B12 d0                 wrong              v2 model PASS  
+  B35 d0                 correct            v2 model PASS  
+  B14 d0                 wrong              v2 model PASS  
+  B14 d1                 wrong              v2 model PASS  
+  B55 d0                 correct            v2 model PASS  
+  B08 d0                 correct            v2 model PASS  
+  B22 d0                 correct            v2 model PASS  
+  B58 d0                 correct            v2 model PASS  
+  B58 d1                 correct            v2 model PASS  
+  B49 d0                 correct            v2 model PASS  
+  B03 d0                 wrong              v2 model PASS  
+  B03 d1                 wrong              v2 model PASS  
+  B47 d0                 correct            v2 model PASS  
+  B23 d0                 correct            v2 model PASS  
+  B26 d0                 wrong              v2 model REJECT  The cited passage shows 39.8 for block size 256, not 32; the score for block size 32 is 42
+  B56 d0                 correct            v2 model PASS  
+  B41 d0                 correct            v2 model PASS  
+  B07 d0                 correct            v2 model PASS  
+  B52 d0                 wrong              v2 model PASS  
+  B52 d1                 wrong              v2 model PASS  
+  B11 d0                 correct            v2 model PASS  
+  B42 d0                 correct            v2 model PASS  
+  B59 d0                 wrong              v2 model PASS  
+  B01 d0                 correct            v2 model PASS  
+  B44 d0                 correct            v2 model PASS  
+  B33 d0                 wrong              v2 model REJECT  The cited passage shows that for the Moshi model after multi‑stream instruct tuning, the M
+  CORRUPT Q17 r0         wrong (corrupted, expected REJECT) v2 model REJECT  The cited passage states that the base models were trained on 8 NVIDIA P100 GPUs for 100,0
+  CORRUPT Q5 r1          wrong (corrupted, expected REJECT) v2 model REJECT  The cited passage explicitly states that each RVQ level is predicted by its own set of wei
+  CORRUPT Q37 r0         wrong (corrupted, expected REJECT) v2 model REJECT  The cited passage states that there are 8 quantizers, each with a codebook size of 2048, n
+  CORRUPT Q30 r0         wrong (corrupted, expected REJECT) v2 model REJECT  The answer states 7 Mamba-2 layers and 20 Transformer layers with a 1:3 ratio, but the cit
+
+[report] POST-HOC: the v2 check prompt was written after seeing these failures (K's grades of the eval drafts); these counts are not an independent test of it.
+  K's three numbers (the drafts production's model check would see = the 27 that passed the code check):
+    wrong drafts caught:            3 of 6   (v1 check: 0 of 6)
+    correct drafts falsely rejected: 0 of 21   (v1 check: 0 of 21)
+    corrupted drafts rejected:       4 of 4
+  extra, the 8 drafts the code check had already rejected: wrong rejected 0 of 5, correct rejected 0 of 3
+-> raw/replay_v2_checks_20261111_153517.json

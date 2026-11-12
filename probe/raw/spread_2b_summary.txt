@@ -1,0 +1,22 @@
+
+== gpt-oss-120b spread_draft: 3 sent, 3 ok, statuses=[200]
+  first ANSWER token ms : n=3 p50=704 p90=929 p95=957 p99=979 max=985
+  first ANY token ms    : n=3 p50=634 p90=852 p95=879 p99=901 max=906
+  total ms              : n=3 p50=1231 p90=1323 p95=1335 p99=1344 max=1346
+  reasoning gap ms (answer - any): n=3 p50=79 p95=89 max=90
+  answer decode tok/s (only calls with >50 ms of answer streaming): n=3 p50=488 p10=487 max=508
+  tokens in/out/reasoning mean: 2840 / 255 / 38
+  prompt-cache hits: 0/3; first-answer-token median cached=nan uncached=704
+  slowest: ttft=985 any=906 reas_tok=49 cached=0 at 16:32:47Z q='How is residual dropout used in the Transformer pa'
+  slowest: ttft=704 any=634 reas_tok=27 cached=0 at 16:32:16Z q='What does the H-Net paper say about byte-level mod'
+
+== gpt-oss-20b spread_short: 20 sent, 20 ok, statuses=[200]
+  first ANSWER token ms : n=20 p50=838 p90=2246 p95=2344 p99=2635 max=2708
+  first ANY token ms    : n=20 p50=792 p90=2230 p95=2297 p99=2584 max=2655
+  total ms              : n=20 p50=880 p90=2281 p95=2391 p99=2672 max=2742
+  reasoning gap ms (answer - any): n=20 p50=49 p95=114 max=134
+  answer decode tok/s (only calls with >50 ms of answer streaming): n=1 p50=980 p10=980 max=980
+  tokens in/out/reasoning mean: 314 / 97 / 54
+  prompt-cache hits: 3/20; first-answer-token median cached=1256 uncached=736
+  slowest: ttft=2708 any=2655 reas_tok=57 cached=0 at 16:30:33Z q='What does the Moshi paper say about the Mimi codec'
+  slowest: ttft=2325 any=2278 reas_tok=70 cached=0 at 16:31:04Z q='Why does the Moshi paper introduce the Helium text'

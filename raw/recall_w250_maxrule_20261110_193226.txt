@@ -1,0 +1,50 @@
+Recall on 33 tuning questions with a labelled passage; pieces w250 (271 pieces); embeddings BAAI/bge-small-en-v1.5
+
+| query | method | recall@6 | recall@20 |
+|---|---|---|---|
+| rewrite | bm25 | 26/33 | 32/33 |
+| rewrite | embed | 22/33 | 25/33 |
+| rewrite | hybrid | 24/33 | 28/33 |
+| rewrite | prod (BM25 top-20 -> cross-encoder top-6) | 24/33 | - |
+| raw | bm25 | 27/33 | 30/33 |
+| raw | embed | 23/33 | 28/33 |
+| raw | hybrid | 28/33 | 30/33 |
+| raw | prod (BM25 top-20 -> cross-encoder top-6) | 26/33 | - |
+| max(raw, rewrite) | prod, passages from the higher-scoring query (K §29) | 25/33 | - |   (rewrite won 21, raw won 12)
+
+Per question, rewritten query: rank of the labelled piece (cross-paper: rank at which the LAST paper appears)
+| id | papers | bm25 rank | embed rank | hybrid rank | in prod top-6 | query |
+|---|---|---|---|---|---|---|
+| Q1 | 1 | 1 | 1 | 1 | yes | average human conversation response time latency comparison |
+| Q3 | 1 | 1 | 3 | 1 | yes | Mimi encoder convolutional blocks striding factors |
+| Q10 | 1 | 1 | 1 | 1 | yes | flatness threshold 1e-4 repetitive text artifacts |
+| Q11 | 1 | 1 | 2 | 2 | yes | watermarking detection score pink noise Audioseal Kirchenbauer |
+| Q13 | 1 | 1 | 1 | 1 | yes | inner-layer dimensionality position-wise feed-forward networks base model |
+| Q16 | 1 | 1 | 4 | 1 | NO | optimizer epsilon value transformer |
+| Q17 | 1 | 1 | 1 | 1 | yes | training time base translation model 8 GPUs hours |
+| Q19 | 1 | 1 | 1 | 1 | yes | attention scaling factor dot product sqrt(d_k) |
+| Q21 | 1 | 1 | 1 | 1 | yes | temperature sampling English-to-German translation inference |
+| Q22 | 1 | 1 | 4 | 2 | yes | Transformer self-attention wall-clock time ByteNet convolution 8 P100 GPUs |
+| Q23 | 1 | 1 | 1 | 1 | yes | English constituency parsing semi-supervised training F1 |
+| Q24 | 1 | 1 | 1 | 1 | yes | feed-forward network linear transformations share parameters transformer |
+| Q29 | 1 | 1 | 1 | 1 | yes | GPT-3 Large scale two-stage model overtakes token-based Transformer baseline validation bits-per-byte bytes of training data |
+| Q30 | 1 | 1 | 1 | 1 | yes | hybrid main network two-stage model layer configuration |
+| Q36 | 1 | 1 | 1 | 1 | yes | In the HG38 DNA modeling experiments, what was the exact learning rate used for the modules operating at the base-pair resolution? |
+| Q39 | 1 | 1 | 1 | 1 | yes | dropout rate big Transformer English-to-French translation |
+| Q46 | 1 | 1 | 3 | 1 | yes | Moshi live voice assistant demo cloud provider deployment |
+| Q60 | 1 | 1 | 4 | 1 | yes | response latency GPU concurrent callers Moshi |
+| Q6 | 1 | 2 | 4 | 2 | yes | Fisher dataset sample rate Moshi |
+| Q27 | 1 | 2 | 5 | 1 | yes | distilled H-Net 1-stage MMLU 5-shot accuracy |
+| Q31 | 1 | 2 | 2 | 2 | yes | Chinese language modeling baseline Transformer tokenizer GPT-2 compresses poorly |
+| Q37 | 1 | 2 | 8 | 2 | yes | Moshi Mimi codec quantizers per 12.5 Hz frame |
+| Q38 | 1 | 3 | 5 | 1 | yes | Helium fine-tuning dataset conversational capabilities |
+| Q56 | 2 | 3 | 41 | 10 | yes | Moshi Helium 5-shot MMLU score H-Net distilled 1-stage |
+| Q28 | 1 | 4 | 101 | 32 | NO | straight-through estimator dechunking dynamic chunking |
+| Q58 | 2 | 4 | 18 | 4 | yes | Moshi Helium positional encoding Transformer positional encoding difference |
+| Q41 | 1 | 7 | 52 | 17 | NO | Chinese language model dataset used in Moshi |
+| Q33 | 1 | 10 | 11 | 8 | NO | dynamic chunking training time overhead percentage compared to standard Transformer |
+| Q42 | 1 | 13 | 57 | 26 | NO | H-Net AdamW optimization scheduler |
+| Q59 | 3 | 15 | 237 | 60 | NO | transformer learning rate schedule |
+| Q2 | 1 | 18 | 57 | 21 | NO | tokenizer 32k vocabulary information loss Moshi |
+| Q5 | 1 | 18 | 43 | 20 | NO | smaller transformer audio codes weight sharing across levels |
+| Q20 | 1 | 39 | 153 | 69 | NO | embedding size 1024 English-to-German base translation |

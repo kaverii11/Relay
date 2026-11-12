@@ -1,0 +1,61 @@
+blind_id,question,k_label,k_note
+B01,Q67,correct,0.7032 vs 0.7404 (2507 Table 4 p.17)
+B02,Q80,wrong,"Helium's AdamW + cosine schedule (2410 §4.4) given as the Transformer's; 1706 §5.3 was C1 (Adam, warmup 4000, inverse sqrt)"
+B03,Q66,wrong,false premise (Helium 55.9 > MPT 46.5); plain refusal = wrong by the §6 false-premise rule
+B04,Q78,wrong,"false premise (codec lr is 8·10^-4, 2410 §3.3.1 p.11; hours not reported); plain refusal = wrong (K's Q78 rule)"
+B05,Q81,correct,6 layers (1706 §3.1 p.3)
+B06,Q82,correct,"160 ms (2410 abstract, §5.3)"
+B07,Q75,correct,"24 kHz, 12.5 Hz (2410 Table 3 row, §5.1 p.23)"
+B08,Q68,refused_wrongly,"unverified on answerable (81.0±1.3 vs 58.8±1.8, 2410 Table 4)"
+B09,Q63,correct,7.0 (2507 Table 1)
+B10,Q71,refused_wrongly,answerable: 21.0 without IM vs 62.3 full (2410 Table 8 p.29-30)
+B11,Q73,refused_wrongly,answerable: Falcon substance_cannabis 56.17 (2410 App. E p.61)
+B12,Q66,correct,"corrects the premise: Helium 55.9 vs MPT 46.5, cited (2410 Table 2 §5.1)"
+B13,Q65,wrong,"two-part question: gave block size 32 (52.97) only, not per-channel (49.29)"
+B14,Q74,refused_wrongly,answerable: Mistral crime_kidnap 26.86 (2410 App. E p.61)
+B15,Q84,wrong,gave the Chinese/code datasets (§3.2); main H-Net LMs use the 100B-token FineWeb-Edu subset (2507 §3 p.11)
+B16,Q82,correct,160 ms
+B17,Q72,wrong,gives 26.1 (that is block size 256) and 35.7 for block size 32 without choosing (2410 Table 11a p.33)
+B18,Q78,wrong,false premise; plain refusal = wrong (K's Q78 rule)
+B19,Q72,correct,"35.7 (2410 Table 11a, block 32)"
+B20,Q80,wrong,"Helium's AdamW + cosine (2410 §4.4), not the Transformer's Adam + warmup/inverse sqrt (1706 §5.3 p.7)"
+B21,Q71,refused_wrongly,answerable (Table 8)
+B22,Q75,correct,"24 kHz, 12.5 Hz"
+B23,Q74,refused_wrongly,answerable (App. E)
+B24,Q79,refused_correctly,not in papers (no dynamic chunking on WMT En-Fr)
+B25,Q80,wrong,"Helium's AdamW + cosine (2410 §4.4), not the Transformer's Adam + warmup/inverse sqrt (1706 §5.3 p.7)"
+B26,Q84,wrong,"Chinese/code datasets, not the 100B-token FineWeb-Edu subset (2507 §3 p.11)"
+B27,Q83,correct,7B (2410 Table 1 caption p.8)
+B28,Q81,correct,6 layers
+B29,Q68,refused_wrongly,unverified on answerable
+B30,Q63,correct,7.0
+B31,Q77,refused_wrongly,"unverified on answerable (d_ff 2048 = 4 x d_model 512, 1706 §3.3 p.5)"
+B32,Q76,wrong,"two-part: SWA right, window size (1024, 2507 §3 p.11) said not given"
+B33,Q84,wrong,"Chinese/code datasets, not the 100B-token FineWeb-Edu subset (2507 §3 p.11)"
+B34,Q77,correct,"2048 vs 512, four times (1706 §3.3 p.5)"
+B35,Q67,correct,0.7032 vs 0.7404
+B36,Q65,wrong,"two-part question: gave block size 32 (52.97) only, not per-channel (49.29)"
+B37,Q81,correct,6 layers
+B38,Q79,refused_correctly,not in papers
+B39,Q76,refused_wrongly,"unverified on answerable (SWA, window 1024)"
+B40,Q79,refused_correctly,not in papers
+B41,Q68,correct,81.0±1.3 vs 58.8±1.8 (2410 Table 4 p.23-24)
+B42,Q83,correct,7B
+B43,Q73,refused_wrongly,answerable (App. E)
+B44,Q74,refused_wrongly,answerable (App. E)
+B45,Q64,wrong,39.0 is the Robustness Score; average HellaSwag is 38.0 (2507 Table 3 p.14)
+B46,Q63,correct,7.0
+B47,Q67,correct,0.7032 vs 0.7404
+B48,Q75,correct,"24 kHz, 12.5 Hz"
+B49,Q83,correct,"7B; note: first citation is the baselines' size sentence (§5.1 p.22), second (Table 1 caption p.8) supports"
+B50,Q77,correct,"2048 vs 512, four times"
+B51,Q72,correct,35.7
+B52,Q65,correct,"49.29 per-channel, 52.97 block size 32 (2410 Table 10 p.33)"
+B53,Q76,wrong,"two-part: SWA right, window size (1024, 2507 §3 p.11) said not given"
+B54,Q82,correct,160 ms
+B55,Q64,wrong,39.0 is the Robustness Score; average is 38.0 (2507 Table 3 p.14)
+B56,Q64,wrong,32.1 is the Drop column; average is 38.0 (2507 Table 3 p.14)
+B57,Q78,wrong,false premise; plain refusal = wrong (K's Q78 rule)
+B58,Q73,refused_wrongly,answerable (App. E)
+B59,Q66,wrong,false premise; plain refusal = wrong by the §6 false-premise rule
+B60,Q71,refused_wrongly,answerable (Table 8)

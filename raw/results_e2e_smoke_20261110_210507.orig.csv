@@ -1,0 +1,4 @@
+request_id,scenario,source,start_time,first_token_ms,total_ms,status,retries,tokens_in,tokens_out,retrieval_setting,answer_grade,service_start_ms,gave_up,degrade_level,model,calls,tokens_in_120b,tokens_out_120b,tokens_in_20b,tokens_out_20b,rerank_ms,reply_kind,draft_ready_ms,draft_sent_ms,arrival_pred_draft_sent_ms,arrival_busy_pred,busy_path,run_variant,standin_profile
+Q3,e2e,stand-in,2026-11-10T15:35:12.967+00:00,1953.6,1953.6,ok,0,2997,318,w250_k6_rr1,,0.6,0,full,openai/gpt-oss-120b,3,2553,147,444,171,138.6,answer,532.9,532.9,750.1,0,,smoke,
+Q2,e2e,stand-in,2026-11-10T15:35:15.925+00:00,882.7,882.7,ok,0,248,83,w250_k6_rr1,,3.5,0,full,,1,0,0,248,83,138.9,refusal,,,750.6,0,,smoke,
+Q24,e2e,stand-in,2026-11-10T15:35:17.812+00:00,2377.2,2377.2,ok,0,2246,293,w250_k6_rr1,,2.1,0,full,openai/gpt-oss-120b,3,1826,136,420,157,141.6,answer,809.4,809.4,750.4,0,,smoke,

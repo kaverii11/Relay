@@ -1,0 +1,283 @@
+{
+  "run": "evalsmoke_day1_20261111_123854",
+  "day": 1,
+  "seed": 42,
+  "order": [
+    "Q57",
+    "Q14",
+    "Q43",
+    "Q12",
+    "Q26",
+    "Q40",
+    "Q45",
+    "Q49",
+    "Q15",
+    "Q35",
+    "Q48",
+    "Q32",
+    "Q7",
+    "Q34",
+    "Q8",
+    "Q47",
+    "Q18",
+    "Q25",
+    "Q4",
+    "Q9"
+  ],
+  "questions": [
+    "Q57",
+    "Q14",
+    "Q43",
+    "Q12",
+    "Q26",
+    "Q40",
+    "Q45",
+    "Q49",
+    "Q15",
+    "Q35",
+    "Q48",
+    "Q32",
+    "Q7",
+    "Q34",
+    "Q8",
+    "Q47",
+    "Q18",
+    "Q25",
+    "Q4",
+    "Q9"
+  ],
+  "settings": [
+    "medium_rerank",
+    "medium_norerank",
+    "medium_k3_norerank"
+  ],
+  "completed": [
+    "Q57",
+    "Q14",
+    "Q43",
+    "Q12",
+    "Q26",
+    "Q40",
+    "Q45",
+    "Q49",
+    "Q15",
+    "Q35",
+    "Q48",
+    "Q32",
+    "Q7",
+    "Q34",
+    "Q8",
+    "Q47",
+    "Q18",
+    "Q25",
+    "Q4",
+    "Q9"
+  ],
+  "completed_before": [],
+  "setting_order_per_question": {
+    "Q57": [
+      "medium_norerank",
+      "medium_k3_norerank",
+      "medium_rerank"
+    ],
+    "Q14": [
+      "medium_k3_norerank",
+      "medium_rerank",
+      "medium_norerank"
+    ],
+    "Q43": [
+      "medium_k3_norerank",
+      "medium_rerank",
+      "medium_norerank"
+    ],
+    "Q12": [
+      "medium_k3_norerank",
+      "medium_rerank",
+      "medium_norerank"
+    ],
+    "Q26": [
+      "medium_rerank",
+      "medium_norerank",
+      "medium_k3_norerank"
+    ],
+    "Q40": [
+      "medium_norerank",
+      "medium_k3_norerank",
+      "medium_rerank"
+    ],
+    "Q45": [
+      "medium_rerank",
+      "medium_norerank",
+      "medium_k3_norerank"
+    ],
+    "Q49": [
+      "medium_k3_norerank",
+      "medium_rerank",
+      "medium_norerank"
+    ],
+    "Q15": [
+      "medium_k3_norerank",
+      "medium_rerank",
+      "medium_norerank"
+    ],
+    "Q35": [
+      "medium_norerank",
+      "medium_k3_norerank",
+      "medium_rerank"
+    ],
+    "Q48": [
+      "medium_norerank",
+      "medium_k3_norerank",
+      "medium_rerank"
+    ],
+    "Q32": [
+      "medium_rerank",
+      "medium_norerank",
+      "medium_k3_norerank"
+    ],
+    "Q7": [
+      "medium_k3_norerank",
+      "medium_rerank",
+      "medium_norerank"
+    ],
+    "Q34": [
+      "medium_k3_norerank",
+      "medium_rerank",
+      "medium_norerank"
+    ],
+    "Q8": [
+      "medium_k3_norerank",
+      "medium_rerank",
+      "medium_norerank"
+    ],
+    "Q47": [
+      "medium_norerank",
+      "medium_k3_norerank",
+      "medium_rerank"
+    ],
+    "Q18": [
+      "medium_norerank",
+      "medium_k3_norerank",
+      "medium_rerank"
+    ],
+    "Q25": [
+      "medium_k3_norerank",
+      "medium_rerank",
+      "medium_norerank"
+    ],
+    "Q4": [
+      "medium_norerank",
+      "medium_k3_norerank",
+      "medium_rerank"
+    ],
+    "Q9": [
+      "medium_rerank",
+      "medium_norerank",
+      "medium_k3_norerank"
+    ]
+  },
+  "gaps_s": {
+    "medium_rerank": 39.857142857142854,
+    "medium_norerank": 39.857142857142854,
+    "medium_k3_norerank": 22.354285714285716
+  },
+  "policy": {
+    "system_deadline_ms": 8000,
+    "gate_threshold": 0.875,
+    "gate_input": "max",
+    "max_retries_per_question": 2,
+    "retry_budget_fraction": 0.1,
+    "retry_jitter": "jitter",
+    "backoff_base_ms": 250,
+    "call_timeout_short_s": 8.0,
+    "call_timeout_draft_s": 15.0,
+    "check_mode": "both",
+    "check_effort": "low",
+    "daily_reserve_fraction": 0.2,
+    "workers": 16,
+    "reasoning_effort": "low",
+    "cache": true,
+    "arrival_check": "on",
+    "learn_limits": true,
+    "extra": {}
+  },
+  "patience_s": 30.0,
+  "cap": 300,
+  "draft_in_est": {
+    "medium_rerank": 2325,
+    "medium_norerank": 2325,
+    "medium_k3_norerank": 1304
+  },
+  "worst_per_question": {
+    "openai/gpt-oss-20b": 6270,
+    "openai/gpt-oss-120b": 13408
+  },
+  "started": "2026-11-11T07:09:02+00:00",
+  "ledger_before": {
+    "openai/gpt-oss-20b": {
+      "requests": 99,
+      "in": 35430,
+      "out": 9933,
+      "tokens": 45363
+    },
+    "openai/gpt-oss-120b": {
+      "requests": 13,
+      "in": 31119,
+      "out": 2225,
+      "tokens": 33344
+    }
+  },
+  "finished": "2026-11-11T07:09:25+00:00",
+  "summary": {
+    "n": 60,
+    "answers": 7,
+    "refusals": 3,
+    "busy": 50,
+    "unverified": 0,
+    "completed": [
+      "Q57",
+      "Q14",
+      "Q43",
+      "Q12",
+      "Q26",
+      "Q40",
+      "Q45",
+      "Q49",
+      "Q15",
+      "Q35",
+      "Q48",
+      "Q32",
+      "Q7",
+      "Q34",
+      "Q8",
+      "Q47",
+      "Q18",
+      "Q25",
+      "Q4",
+      "Q9"
+    ],
+    "by_setting": {
+      "medium_rerank": 20,
+      "medium_norerank": 20,
+      "medium_k3_norerank": 20
+    },
+    "limiter_wait_ms_total": 4112.2,
+    "tokens_cached_total": 0,
+    "requests_sent": null,
+    "stopped": null
+  },
+  "ledger_after": {
+    "openai/gpt-oss-20b": {
+      "requests": 99,
+      "in": 35430,
+      "out": 9933,
+      "tokens": 45363
+    },
+    "openai/gpt-oss-120b": {
+      "requests": 13,
+      "in": 31119,
+      "out": 2225,
+      "tokens": 33344
+    }
+  }
+}
