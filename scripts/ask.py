@@ -62,7 +62,7 @@ def main():
 
     stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
     run = f"ask_{stamp}"
-    pl = Pipeline(base_url=a.base_url or GROQ, api_key="standin", source="groq" if real else "stand-in",
+    pl = Pipeline(base_url=a.base_url or GROQ, api_key="standin", source="real" if real else "stand-in",
                   setting=setting, policy=pol, limiter=Limiter([SMALL, BIG]), cache=ExactCache(), retriever=ret,
                   budget=Budget(run, 5) if real else None)
     if real:

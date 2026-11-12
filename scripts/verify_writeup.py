@@ -44,7 +44,7 @@ def label(r):
         sc = "e2e evening set"
     if r["scenario"] == "v1v2":
         sc = f"follow-up, {FOLLOWUP_VERSION[r['retrieval_setting']]}"
-    prof = "real Groq" if r["source"] == "groq" else ("stand-in, evening" if "evening" in r["standin_profile"] else "stand-in, afternoon")
+    prof = "real Groq" if r["source"] in ("groq", "real") else ("stand-in, evening" if "evening" in r["standin_profile"] else "stand-in, afternoon")
     return sc, prof
 
 

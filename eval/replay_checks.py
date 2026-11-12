@@ -87,7 +87,7 @@ def main():
     real = a.base_url is None
     pol = Policy()
     # code check first (free); model check only for those that pass it
-    pl = Pipeline(base_url=a.base_url or GROQ, api_key="standin", source="groq" if real else "stand-in",
+    pl = Pipeline(base_url=a.base_url or GROQ, api_key="standin", source="real" if real else "stand-in",
                   setting=SETTINGS["medium_rerank"], policy=pol, limiter=Limiter([SMALL]), cache=None, retriever=SimpleNamespace(chunks=[SimpleNamespace(text="x" * 1000)]))
     plan = []
     for e in entries:

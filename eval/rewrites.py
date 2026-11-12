@@ -142,7 +142,7 @@ def main():
                "empty_rewrite_fallback": fallback,
                "tokens_in": r.tokens_in, "tokens_out": r.tokens_out, "total_ms": round(r.total_ms or 0, 1),
                "model": SMALL, "temperature": 0.0, "reasoning_effort": pol.reasoning_effort,
-               "source": "groq" if real else "stand-in",
+               "source": "real" if real else "stand-in",
                "wall": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")}
         if sq:
             done[match_key(t["q"])] = rec

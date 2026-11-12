@@ -134,7 +134,7 @@ def part_a(L):
             ev = rec.get("events", [])
             drafts = [e for e in ev if e["ev"] == "draft_out"]
             checks = [e for e in ev if e["ev"] == "check"]
-            if not drafts or rec.get("row", {}).get("source") not in (None, "groq"):
+            if not drafts or rec.get("row", {}).get("source") not in (None, "groq", "real"):
                 continue
             n_q += 1
             rejected = []

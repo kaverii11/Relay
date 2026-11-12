@@ -99,7 +99,7 @@ def main():
     for nm in names:
         ret = Retriever(SETTINGS[nm])
         ret.search("warm-up query about attention heads")
-        pls[nm] = Pipeline(base_url=a.base_url or GROQ, api_key="standin", source="groq" if real else "stand-in",
+        pls[nm] = Pipeline(base_url=a.base_url or GROQ, api_key="standin", source="real" if real else "stand-in",
                            setting=SETTINGS[nm], policy=ARMS[nm](), limiter=lim, cache=None, retriever=ret, budget=budget)
         pls[nm].keep_passages = True
         pls[nm].daily_dump = ROOT / f"raw/daily429_{run}.json"

@@ -102,7 +102,7 @@ def main():
     a = ap.parse_args()
     es = entries()
     pol = Policy(check_prompt="v2")
-    pl = Pipeline(base_url=GROQ, api_key="x", source="groq", setting=SETTINGS["chosen_v2"], policy=pol,
+    pl = Pipeline(base_url=GROQ, api_key="x", source="real", setting=SETTINGS["chosen_v2"], policy=pol,
                   limiter=Limiter([SMALL]), cache=None, retriever=SimpleNamespace(chunks=[SimpleNamespace(text="x" * 1000)]))
     for e in es:
         e["est_in"] = est_tokens(check_messages(e["question"], e["draft"].get("answer", ""), e["draft"]["claims"], e["hits"], variant="v2"))

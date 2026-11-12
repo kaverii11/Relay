@@ -19,7 +19,7 @@ one re-check) and the per-model 24 h token ceiling (relay/budget.py). The probe 
 Sequential; --gap seconds between questions: 30 (K §34), because at 8 s one ~2.5k-token draft every
 ~11 s is ~14k input tok/min on 120b, over its 7000 ITPM, so the limiter would add waits to the timing.
 The limiter wait of every call is logged (call_start.limiter_wait_s) and summed per question.
-Output: raw/results_e2e_{tag}_{stamp}.csv (results.csv columns, source=groq, run_variant=tag),
+Output: raw/results_e2e_{tag}_{stamp}.csv (results.csv columns, source=real, run_variant=tag),
         raw/events_e2e_{tag}_{stamp}.jsonl (per question: result incl. the passages the drafter saw,
         every draft's claims, each check's verdict and redraft flag, limiter waits),
         raw/answers_e2e_{tag}_{stamp}.md (the same, readable: K reads the answers tonight),
@@ -182,7 +182,7 @@ def main():
     cap = a.cap or 5 * n
     lim = Limiter([SMALL, BIG])
     budget = Budget(run, cap) if real else None
-    pl = Pipeline(base_url=a.base_url or GROQ, api_key="standin", source="stand-in" if not real else "groq",
+    pl = Pipeline(base_url=a.base_url or GROQ, api_key="standin", source="stand-in" if not real else "real",
                   setting=setting, policy=pol, limiter=lim, cache=ExactCache(), retriever=ret, budget=budget)
     draft_in = round(pl.draft_est(setting.k))
     check_in = CHECK_IN
