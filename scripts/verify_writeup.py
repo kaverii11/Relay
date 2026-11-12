@@ -19,7 +19,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from analysis.tables import f, paid_cost, pcts, peak_queue  # noqa: E402
+from analysis.tables import f, is_rejected, paid_cost, pcts, peak_queue, served  # noqa: E402
 
 FILES = ["steady_afternoon_20261110_233137", "burst_afternoon_20261111_003145", "overload_afternoon_20261111_005059",
          "minute_limit_halved_afternoon_20261111_012058", "daily_exhausted_afternoon_20261111_015059",
@@ -98,8 +98,9 @@ def main():
             continue
         starts = sorted(dt.datetime.fromisoformat(r["start_time"]).timestamp() for r in rs)
         ends = [dt.datetime.fromisoformat(r["start_time"]).timestamp() + f(r["total_ms"]) / 1000 for r in rs]
-        got = [r for r in rs if r["status"] == "ok" and f(r["first_token_ms"]) is not None]
-        nt = f"; no token {100 * (len(rs) - len(got)) / len(rs):.1f}%"
+        sv = served(rs)                     # same rule as analysis/tables.py: input-guard rejections excluded
+        got = [r for r in sv if r["status"] == "ok" and f(r["first_token_ms"]) is not None]
+        nt = f"; no token {100 * (len(sv) - len(got)) / len(sv):.1f}%"
         ft, tot = pcts([f(r["first_token_ms"]) for r in got]), pcts([f(r["total_ms"]) for r in got])
         busy = [f(r["total_ms"]) for r in rs if r["reply_kind"] == "busy"]
         want = [str(len(rs)), f"{max(ends) - starts[0]:.0f}",
@@ -117,10 +118,10 @@ def main():
             continue
         n = len(rs)
         pc = lambda s: f"{100 * sum(r['status'] == s for r in rs) / n:.1f}"  # noqa: E731
-        ok = sum(r["status"] == "ok" for r in rs)
+        ok = sum(r["status"] == "ok" for r in served(rs))
         unv = sum(r["status"] == "ok" and r["reply_kind"] == "unverified" for r in rs)
         toks = sum(int(r["tokens_in"]) + int(r["tokens_out"]) for r in rs)
-        want = [f"{pc('ok')} ({100 * unv / n:.1f})", pc("rate_limited"), pc("timeout"), pc("error"),
+        want = [f"{100 * ok / n:.1f} ({100 * unv / n:.1f})", pc("rate_limited"), pc("timeout"), pc("error"),
                 f"{np.mean([int(r['retries']) for r in rs]):.2f}", str(peak_queue(rs)),
                 f"{toks / ok:.0f}" if ok else "no answers",
                 f"$0 billed (free tier); ${paid_cost(rs) / ok * 1000:.3f} at paid prices"]
@@ -144,8 +145,9 @@ def main():
         dr = [int(r["tokens_in"]) + int(r["tokens_out"]) for r in rs if r["reply_kind"] == "answer"]
         tq = np.mean([int(r["tokens_in"]) + int(r["tokens_out"]) for r in rs])
         lw = [f(r["limiter_wait_ms"]) or 0.0 for r in rs]
-        ft = pcts([f(r["first_token_ms"]) - w for r, w in zip(rs, lw)], (50, 95))
-        tot = pcts([f(r["total_ms"]) - w for r, w in zip(rs, lw)], (50, 95))
+        rw = [(r, w) for r, w in zip(rs, lw) if not is_rejected(r)]   # same rule as analysis/tables.py
+        ft = pcts([f(r["first_token_ms"]) - w for r, w in rw], (50, 95))
+        tot = pcts([f(r["total_ms"]) - w for r, w in rw], (50, 95))
         first = row[0].startswith("250 words, 6 pieces, re-rank")
         want_correct = f"{pc('correct')} ({coa} of answerable)" if first else f"{pc('correct')} ({coa})"
         want_tok = (f"{tq:.0f} per question (n={n}); {np.mean(dr):.0f} per drafted answer (n={len(dr)})" if first

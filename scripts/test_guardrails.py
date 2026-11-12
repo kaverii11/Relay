@@ -9,6 +9,7 @@
   5. budget, processes: 4 processes recording at once lose no ledger entries (lock + atomic write)
   6. budget, corrupt ledger: spending is refused (fail closed), not treated as "nothing used"
   7. service: with max_queue, arrivals beyond it get the busy reply at once (load shedding)
+  8. tables: input-guard rejections are counted apart, not in latency percentiles or Succeeded %
 Each test uses its own temporary ledger; the real probe/raw/ledger.json is never touched.
 """
 from __future__ import annotations
@@ -163,6 +164,60 @@ def test_shed(pl):
     _ok("service: max_queue=2, 3 of 5 arrivals shed with the busy reply, 2 queued")
 
 
+def _table_rows(text, title, label):
+    """The cells of the row starting with `label` in the table printed under `title` (analysis/tables.py output)."""
+    part = text.split(title, 1)[1]
+    for line in part.splitlines()[1:]:
+        if line.startswith("| " + label):
+            return [c.strip() for c in line.strip("|").split("|")]
+        if line and not line.startswith("|"):
+            break
+    raise AssertionError(f"no row {label!r} under {title!r}")
+
+
+def test_tables():
+    """analysis/tables.py: rejected rows are out of the latency percentiles and Succeeded %, and counted apart.
+    Real rows from results.csv (steady stand-in run + the eval), plus 6 synthetic rejections copied from them."""
+    import contextlib
+    import csv
+    import io
+    from analysis import tables
+    rows = list(csv.DictReader(open(ROOT / "results.csv")))
+    base = [r for r in rows if (r["scenario"], r["run_variant"]) in (("steady", ""), ("eval", "day1"))]
+    steady = [r for r in base if r["scenario"] == "steady" and r["daily_phase"] == "before"]   # one table row
+    ev = [r for r in base if r["scenario"] == "eval" and r["retrieval_setting"] == "w250_k3_rr0"]
+    fake = [{**r, "request_id": r["request_id"] + "-rej", "status": "ok", "reply_kind": "rejected", "first_token_ms": "0.1",
+             "total_ms": "0.1", "tokens_in": "0", "tokens_out": "0", "retries": "0", "calls": "0"}
+            for r in steady[:4] + ev[:2]]
+
+    def run(rs):
+        """tables.main on these rows; its printed output."""
+        path = TMP / f"t{len(rs)}.csv"
+        with open(path, "w", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=list(rows[0]))
+            w.writeheader()
+            w.writerows(rs)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            tables.main(str(path))
+        return out.getvalue()
+    before, after = run(base), run(base + fake)
+    lab = "steady (before 120b day budget gone)"
+    a0, a1 = _table_rows(before, "Table 2a", lab), _table_rows(after, "Table 2a", lab)
+    assert a1[3] == str(len(steady) + 4), a1[3]                          # requests sent: every row counts
+    assert a0[6:9] == a1[6:9], (a0[6:9], a1[6:9])                        # first token, total, busy: unchanged
+    b0, b1 = _table_rows(before, "Table 2b", lab), _table_rows(after, "Table 2b", lab)
+    ok = sum(r["status"] == "ok" for r in steady)
+    assert b1[1] == f"{100 * ok / (len(steady) + 4):.1f}", (b1[1], ok)   # Succeeded % excludes the 4 rejections
+    assert b0[1] == f"{100 * ok / len(steady):.1f}"
+    t0, t1 = _table_rows(before, "Table 3", "w250_k3_rr0"), _table_rows(after, "Table 3", "w250_k3_rr0")
+    assert t0[9:11] == t1[9:11], (t0[9:11], t1[9:11])                    # Table 3 first token / total: unchanged
+    line = [x for x in after.splitlines() if x.startswith("Rejected by the input guard")][0]
+    assert f"4 of {len(steady) + 4}" in line and "eval" in line, line
+    assert "none in any scenario" in [x for x in before.splitlines() if x.startswith("Rejected by")][0]
+    _ok("tables: rejected rows counted apart, out of latency percentiles and Succeeded % (Tables 2a, 2b, 3)")
+
+
 def main():
     """Run every test; exit 1 on the first failure."""
     before = REAL.stat().st_mtime if REAL.exists() else None
@@ -175,6 +230,7 @@ def main():
     pl = _pipeline()
     test_reject(pl)
     test_shed(pl)
+    test_tables()
     assert (REAL.stat().st_mtime if REAL.exists() else None) == before, "real ledger was touched"
     print("all passed; the real ledger was not touched")
 

@@ -81,6 +81,17 @@ def pcts(vals, ps=(50, 95, 99)):
     return " / ".join(out) + f" (n={n})"
 
 
+def is_rejected(r) -> bool:
+    """Input-guard rejection (relay/guard.py: empty or over-long question). Status is "ok" (the brief's enum) but no
+    model ran, so it is left out of latency percentiles and Succeeded %, and counted on its own line (K, 2026-11-12)."""
+    return r.get("reply_kind") == "rejected"
+
+
+def served(rs):
+    """The rows that went through the service (every row except input-guard rejections)."""
+    return [r for r in rs if not is_rejected(r)]
+
+
 def peak_queue(rows):
     """Most requests waiting at one instant (arrived, first model call not yet sent)."""
     ev = []
@@ -125,8 +136,9 @@ def main(path):
         ends = [dt.datetime.fromisoformat(r["start_time"]).timestamp() + f(r["total_ms"]) / 1000 for r in rs]
         dur = max(ends) - starts[0]
         rate = len(rs) / (starts[-1] - starts[0]) * 60 if len(rs) > 1 else float("nan")
-        got = [r for r in rs if r["status"] == "ok" and f(r["first_token_ms"]) is not None]
-        no_tok = f"; no token {100 * (len(rs) - len(got)) / len(rs):.1f}%"
+        sv = served(rs)                     # latency only over requests the service actually handled
+        got = [r for r in sv if r["status"] == "ok" and f(r["first_token_ms"]) is not None]
+        no_tok = f"; no token {100 * (len(sv) - len(got)) / len(sv):.1f}%" if sv else "; no token n/a"
         ft = pcts([f(r["first_token_ms"]) for r in got])
         tot = pcts([f(r["total_ms"]) for r in got])
         busy = [f(r["total_ms"]) for r in rs if r["reply_kind"] == "busy"]
@@ -141,18 +153,23 @@ def main(path):
     for (sc, src, st), rs in sorted(by.items()):
         n = len(rs)
         pc = lambda s: 100 * sum(r["status"] == s for r in rs) / n  # noqa: E731
-        ok = sum(r["status"] == "ok" for r in rs)
+        okr = [r for r in served(rs) if r["status"] == "ok"]    # Succeeded: input-guard rejections excluded
+        ok = len(okr)
         toks = sum(int(r["tokens_in"]) + int(r["tokens_out"]) for r in rs)
         tpa = f"{toks / ok:.0f}" if ok else "no answers"
-        okr = [r for r in rs if r["status"] == "ok"]
         ans = [r for r in okr if r["reply_kind"] == "answer"]
         ref = [r for r in okr if r["reply_kind"] == "refusal"]
         unv = [r for r in okr if r["reply_kind"] == "unverified"]
         per = lambda xs: f"${paid_cost(xs) / len(xs) * 1000:.3f}" if xs else "n/a"  # noqa: E731
         cost = (f"$0 billed (free tier); paid on-demand: ${paid_cost(rs) / ok * 1000:.3f} all-in "
                 f"[drafted {per(ans)}, refusals {per(ref)}, unverified {per(unv)}; refusal share {100 * len(ref) / ok:.1f}%]") if ok else "no answers"
-        print(f"| {sc} ({src}) | {pc('ok'):.1f} | {100 * len(unv) / n:.1f} | {pc('rate_limited'):.1f} | {pc('timeout'):.1f} | {pc('error'):.1f} | "
+        print(f"| {sc} ({src}) | {100 * ok / n:.1f} | {100 * len(unv) / n:.1f} | {pc('rate_limited'):.1f} | {pc('timeout'):.1f} | {pc('error'):.1f} | "
               f"{np.mean([int(r['retries']) for r in rs]):.2f} | {peak_queue(rs)} | {tpa} | {cost} |")
+
+    rej = [f"{lab} ({src}): {sum(map(is_rejected, rs))} of {len(rs)}"
+           for (lab, src, _), rs in sorted(by.items()) if any(map(is_rejected, rs))]
+    print("\nRejected by the input guard (reply_kind rejected; not in Succeeded % or the latency percentiles): "
+          + ("; ".join(rej) or "none in any scenario"))
 
     print("\nLoad mix (extra, K §22): question rate vs draft demand, from results.csv")
     print("| Scenario | Questions/min | Drafts/min (reached the draft) | Drafts / ceiling (2.5) | "
@@ -192,8 +209,9 @@ def main(path):
             tda = f"{np.mean(dr):.0f} (n={len(dr)})" if dr else "n/a (n=0)"
             # K §41: Table 3 latency EXCLUDES our own limiter's planned waits; the wait is its own column
             lw = [f(r.get("limiter_wait_ms")) or 0.0 for r in rs]
-            ft = pcts([None if f(r["first_token_ms"]) is None else f(r["first_token_ms"]) - w for r, w in zip(rs, lw)], (50, 95))
-            tot = pcts([f(r["total_ms"]) - w if r["status"] == "ok" else None for r, w in zip(rs, lw)], (50, 95))
+            rw = [(r, w) for r, w in zip(rs, lw) if not is_rejected(r)]   # dropped, not counted as "no token"
+            ft = pcts([None if f(r["first_token_ms"]) is None else f(r["first_token_ms"]) - w for r, w in rw], (50, 95))
+            tot = pcts([f(r["total_ms"]) - w if r["status"] == "ok" else None for r, w in rw], (50, 95))
             wl = sorted(lw)
             na = [r for r in rs if ans_of.get(r["request_id"])]
             coa = f"{sum(r['answer_grade'] == 'correct' for r in na)}/{len(na)}" if ans_of else "not measured"
