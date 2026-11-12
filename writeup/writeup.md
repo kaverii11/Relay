@@ -4,7 +4,7 @@
 
 The Relay answers questions about three papers on Groq's free tier, and says so when the papers are silent. Five steps: gpt-oss-20b turns the question into a query (**understand**); BM25 fetches three 250-word pieces, the tool call (**retrieve**); a MiniLM cross-encoder scores them, and below 0.713 it refuses without calling 120b (**decide**); gpt-oss-120b answers with a verbatim quote behind every claim (**draft**); code confirms each quote is in its passage and 20b judges support; one redraft, then a refusal (**check**). Around it: rate limiters, a deadline queue, a fallback ladder (cache, 20b draft, busy reply).
 
-**The decision that shaped it most:** check the whole draft before sending a token. A token on screen can't be taken back, so a wrong start is worse than a short wait. The price is latency: unloaded first token p50 3.2 s (n=8).
+**The decision that shaped it most:** check the whole draft before sending a token. A token on screen can't be taken back, so a wrong start is worse than a short wait. The price is latency: unloaded first token p50 3.2 s (answers only, n=8).
 
 ## 2. The real service and my stand-in
 
@@ -32,7 +32,7 @@ All of it came before the first token: nothing is sent until the check passes. M
 
 ## 5. When a limit is hit
 
-A **per-minute** limit frees up soon, so a request waits if its draft can still beat the deadline, and otherwise gets the busy reply at once. A **per-day** limit doesn't, so a daily 429 is never retried: at the 20 % reserve 120b steps aside and 20b (its own quota) drafts; when 20b's day is gone too, the busy reply costs no model call. Answers get **weaker** before anyone is turned away: fewer pieces, then 20b. Nothing is dropped silently, though injected provider failures can still produce errors.
+A **per-minute** limit frees up soon, so a request waits if its draft can still beat the deadline, and otherwise gets the busy reply at once. A **per-day** limit doesn't, so a daily 429 is never retried: at the 20 % reserve 120b steps aside and 20b (its own quota) drafts; when 20b's day is gone too, the busy reply costs no model call. Answers get **weaker** before anyone is turned away: 6 pieces become 3, then 20b; the chosen 250/3 goes straight to 20b. Injected provider failures still cause errors.
 
 Stand-in, limit halved (70 requests): 11 of 28 answers weaker, 8 delayed, 25 busy, none gave up; past the daily reserve (44): 32 busy at arrival, 4 mid-pipeline, 3 answers from 20b.
 
@@ -50,7 +50,7 @@ Three settings on real Groq, 20 questions: 250-word pieces, 6 re-ranked; 6 in BM
 
 ## 6. Retries
 
-SDK retries are off, so every retry is a counted decision. Per-minute 429s are retried after retry-after plus up to half again (≥ 0.5 s), 5xx with exponential backoff and full jitter; a per-day 429 never. At most 2 per question, none past the deadline, all within a shared cap of ≤ 10 % of traffic. Timeouts get one retry on short calls (understand, check), never on the draft.
+SDK retries are off, so every retry is a counted decision. Per-minute 429s are retried after retry-after plus up to half again (≥ 0.5 s), 5xx with exponential backoff and full jitter; a per-day 429 never. At most 2 per question, none past the deadline, all within a shared 10 % retry budget (floor of 2). Timeouts get one retry on short calls (understand, check), never on the draft.
 
 **When retrying made it worse:** with the per-minute limit halved and not learned from the 429 body, blind retries hit 28 input-token 429s instead of 18, and success fell from 64.3 % to 60.0 %. Real Groq: 0 retries in any run (352 model calls).
 
@@ -64,7 +64,7 @@ The time is the limiter's longest counter wait, an estimate because the tokens-p
 
 ## 8. What I'm unsure about, what I left out, what I learned
 
-**Least certain assumption:** patience, modelled as lognormal with a 15 s median and never measured. If people wait longer, the 8 s deadline throws away answers; if less, the busy reply arrives after they've left.
+**Least certain assumption:** patience, modelled as lognormal with a 15 s median and never measured. If people wait longer, the 8 s deadline throws away answers; if less, they leave before any reply: the request is cancelled, its stream closed, nothing sent late.
 
 **Not built:** (1) merging identical in-flight questions: more capacity in bursts, but one failure hits everyone waiting. (2) A clarification turn: vague Q16 and Q59 (tested offline) were silently rewritten toward the Transformer paper; my rubric has no reply type for asking back.
 
@@ -86,7 +86,7 @@ Claude Code (CC) built and ran everything; a second Claude chat (A2) reviewed my
 
 **Overruled:** after the eval, A2 recommended freezing the system. I fixed it anyway: v2 repeats each table's caption and header in every piece and makes the check name each number's row and column; v3 adds a paper hint and stops a redraft re-rolling a claim the check rejected. On 20 new questions (Table 4) they got 9 / 8 / 8 correct, and Q80, a paraphrase of my failing question kept as a development case, stayed wrong in all three. Neither fix produced a measurable gain at n=20, so v1 stays the default. The run did show that the checker is unstable even at temperature 0 (Q77's "four times", same quote, passed in v1 and v2 and failed in v3; in development the Helium claim behind Q80 went FAIL/OK/FAIL/OK), and dropped table rows cost answers (Q72: wrong in v1, right once v2 restored Table 11's header).
 
-**Distinctly mine:** 55 of the 60 eval questions and 12 of the 20 follow-ups (two unanswerable traps), plus asking for easy baseline questions; blind grading of all 60 eval answers; the 8 s deadline, the midpoint rule behind 0.713, the arrival check and its shadow-mode test; choosing 250/3; finding the table-row bug with my own question; the v2 and v3 rules. At my request CC graded the 60 follow-up answers against the PDFs, an exception to my no-LLM-judge rule; it also wrote 8 of the 20 questions (labelled). I re-checked the 18 disagreements against the papers and reviewed the other 42; none changed.
+**Distinctly mine:** 55 of the 60-question pool (20 held out) and 12 of the 20 follow-ups (two unanswerable traps), plus asking for easy baseline questions; blind grading of all 60 eval answers; the 8 s deadline, the midpoint rule behind 0.713, the arrival check and its shadow-mode test; choosing 250/3; finding the table-row bug with my own question; the v2 and v3 rules. At my request CC graded the 60 follow-up answers against the PDFs, an exception to my no-LLM-judge rule; it also wrote 8 of the 20 questions (labelled). I re-checked the 18 disagreements against the papers and reviewed the other 42; none changed.
 
 ---
 
@@ -106,24 +106,24 @@ Claude Code (CC) built and ran everything; a second Claude chat (A2) reviewed my
 
 ### Table 2a: Latency, one row per load scenario
 
-Evaluated on the stand-in (250 words / 6 pieces / re-rank), with real Groq rows at the bottom. Percentiles cover completed replies (format: p50 / p95 / p99, sample size $n$, % receiving no tokens; † = p99 with $n < 100$). Because replies are verified before streaming, first-token time equals total time. Scenarios exceeding the 120b daily budget are split into before and after.
+Evaluated on the stand-in (250 words / 6 pieces / re-rank), with real Groq rows at the bottom. Percentiles cover completed replies (format: p50 / p95 / p99, sample size $n$, % receiving no tokens; † = p99 with $n < 100$). Because replies are verified before streaming, first-token time equals total time. Scenarios where 120b stopped serving drafts are split into before and after that point. In every such run it was the 20 % reserve: 120b steps aside with a fifth of its day still unspent, so "after" does not mean its quota is used up (only in daily budget exhausted had the stand-in's 120b day been set to 0).
 
 | Scenario | Real or stand-in | Requests sent | Duration (s) | Offered rate (per min) | First token p50 / p95 / p99 (ms) | Total time p50 / p95 / p99 (ms) | Time to busy reply p50 / p95 (ms) |
 |---|---|---|---|---|---|---|---|
-| steady — before the 120b day budget is gone | stand-in, afternoon | 90 | 2435 | 2.22 | 1870 / 4635 / 6971† (n=86; no token 4.4%) | 1870 / 4635 / 6971† (n=86; no token 4.4%) | 2060 / 4430 (n=4) |
-| steady — after the 120b day budget is gone | stand-in, afternoon | 51 | 1074 | 2.85 | 1781 / 5405 / 7493† (n=43; no token 15.7%) | 1781 / 5405 / 7493† (n=43; no token 15.7%) | 1391 / 5660 (n=8) |
+| steady — before 120b stops serving drafts | stand-in, afternoon | 90 | 2435 | 2.22 | 1870 / 4635 / 6971† (n=86; no token 4.4%) | 1870 / 4635 / 6971† (n=86; no token 4.4%) | 2060 / 4430 (n=4) |
+| steady — after 120b stops serving drafts | stand-in, afternoon | 51 | 1074 | 2.85 | 1781 / 5405 / 7493† (n=43; no token 15.7%) | 1781 / 5405 / 7493† (n=43; no token 15.7%) | 1391 / 5660 (n=8) |
 | burst | stand-in, afternoon | 86 | 1141 | 4.54 | 1842 / 4626 / 5903† (n=61; no token 29.1%) | 1842 / 4626 / 5903† (n=61; no token 29.1%) | 1 / 4643 (n=25) |
 | burst | stand-in, evening | 86 | 1145 | 4.54 | 2748 / 6146 / 7008† (n=51; no token 40.7%) | 2748 / 6146 / 7008† (n=51; no token 40.7%) | 1 / 5655 (n=31) |
-| sustained overload — before the 120b day budget is gone | stand-in, afternoon | 172 | 1317 | 7.85 | 1816 / 5769 / 7170 (n=114; no token 33.7%) | 1816 / 5769 / 7170 (n=114; no token 33.7%) | 1955 / 5591 (n=56) |
-| sustained overload — after the 120b day budget is gone | stand-in, afternoon | 50 | 471 | 6.36 | 0 / 5180 / 6267† (n=42; no token 16.0%) | 0 / 5180 / 6267† (n=42; no token 16.0%) | 1661 / 6472 (n=8) |
-| sustained overload — before the 120b day budget is gone | stand-in, evening | 172 | 1320 | 7.85 | 3044 / 6544 / 7720 (n=120; no token 30.2%) | 3044 / 6544 / 7720 (n=120; no token 30.2%) | 2567 / 6849 (n=46) |
-| sustained overload — after the 120b day budget is gone | stand-in, evening | 50 | 471 | 6.36 | 0 / 5629 / 6529† (n=46; no token 8.0%) | 0 / 5629 / 6529† (n=46; no token 8.0%) | 4320 / 6721 (n=4) |
-| sustained overload (arrival check in shadow mode) — before the 120b day budget is gone | stand-in, afternoon | 175 | 1340 | 7.85 | 1863 / 5829 / 6779 (n=135; no token 22.9%) | 1863 / 5829 / 6779 (n=135; no token 22.9%) | 1874 / 6551 (n=40) |
-| sustained overload (arrival check in shadow mode) — after the 120b day budget is gone | stand-in, afternoon | 47 | 429 | 6.58 | 1 / 3191 / 3350† (n=44; no token 6.4%) | 1 / 3191 / 3350† (n=44; no token 6.4%) | 929 / 3371 (n=3) |
+| sustained overload — before 120b stops serving drafts | stand-in, afternoon | 172 | 1317 | 7.85 | 1816 / 5769 / 7170 (n=114; no token 33.7%) | 1816 / 5769 / 7170 (n=114; no token 33.7%) | 1955 / 5591 (n=56) |
+| sustained overload — after 120b stops serving drafts | stand-in, afternoon | 50 | 471 | 6.36 | 0 / 5180 / 6267† (n=42; no token 16.0%) | 0 / 5180 / 6267† (n=42; no token 16.0%) | 1661 / 6472 (n=8) |
+| sustained overload — before 120b stops serving drafts | stand-in, evening | 172 | 1320 | 7.85 | 3044 / 6544 / 7720 (n=120; no token 30.2%) | 3044 / 6544 / 7720 (n=120; no token 30.2%) | 2567 / 6849 (n=46) |
+| sustained overload — after 120b stops serving drafts | stand-in, evening | 50 | 471 | 6.36 | 0 / 5629 / 6529† (n=46; no token 8.0%) | 0 / 5629 / 6529† (n=46; no token 8.0%) | 4320 / 6721 (n=4) |
+| sustained overload (arrival check in shadow mode) — before 120b stops serving drafts | stand-in, afternoon | 175 | 1340 | 7.85 | 1863 / 5829 / 6779 (n=135; no token 22.9%) | 1863 / 5829 / 6779 (n=135; no token 22.9%) | 1874 / 6551 (n=40) |
+| sustained overload (arrival check in shadow mode) — after 120b stops serving drafts | stand-in, afternoon | 47 | 429 | 6.58 | 1 / 3191 / 3350† (n=44; no token 6.4%) | 1 / 3191 / 3350† (n=44; no token 6.4%) | 929 / 3371 (n=3) |
 | per-minute limit halved | stand-in, afternoon | 70 | 1789 | 2.35 | 1703 / 3347 / 5623† (n=45; no token 35.7%) | 1703 / 3347 / 5623† (n=45; no token 35.7%) | 2023 / 5744 (n=25) |
 | per-minute limit halved (limit not learned) | stand-in, afternoon | 70 | 1789 | 2.35 | 1793 / 3471 / 5985† (n=42; no token 40.0%) | 1793 / 3471 / 5985† (n=42; no token 40.0%) | 802 / 4973 (n=28) |
-| daily budget exhausted — before the 120b day budget is gone | stand-in, afternoon | 2 | 56 | 2.29 | 1983 / 3396 / 3522† (n=2; no token 0.0%) | 1983 / 3396 / 3522† (n=2; no token 0.0%) | no busy replies |
-| daily budget exhausted — after the 120b day budget is gone | stand-in, afternoon | 44 | 1044 | 2.53 | 1294 / 3742 / 4515† (n=8; no token 81.8%) | 1294 / 3742 / 4515† (n=8; no token 81.8%) | 1 / 1592 (n=36) |
+| daily budget exhausted — before 120b stops serving drafts | stand-in, afternoon | 2 | 56 | 2.29 | 1983 / 3396 / 3522† (n=2; no token 0.0%) | 1983 / 3396 / 3522† (n=2; no token 0.0%) | no busy replies |
+| daily budget exhausted — after 120b stops serving drafts | stand-in, afternoon | 44 | 1044 | 2.53 | 1294 / 3742 / 4515† (n=8; no token 81.8%) | 1294 / 3742 / 4515† (n=8; no token 81.8%) | 1 / 1592 (n=36) |
 | e2e evening set | real Groq | 12 | 363 | 2.01 | 2642 / 5222 / 5623† (n=12; no token 0.0%) | 2642 / 5222 / 5623† (n=12; no token 0.0%) | no busy replies |
 | eval, 250/3 BM25 | real Groq | 20 | 2090 | 0.58 | 1557 / 3561 / 3589† (n=20; no token 0.0%) | 1557 / 3561 / 3589† (n=20; no token 0.0%) | no busy replies |
 | eval, 250/6 BM25 | real Groq | 20 | 2088 | 0.58 | 1600 / 3390 / 3548† (n=20; no token 0.0%) | 1600 / 3390 / 3548† (n=20; no token 0.0%) | no busy replies |
@@ -132,7 +132,7 @@ Evaluated on the stand-in (250 words / 6 pieces / re-rank), with real Groq rows 
 | follow-up, v2 | real Groq | 20 | 1616 | 0.74 | 2613 / 3973 / 4381† (n=20; no token 0.0%) | 2613 / 3973 / 4381† (n=20; no token 0.0%) | no busy replies |
 | follow-up, v3 | real Groq | 20 | 1617 | 0.74 | 3088 / 4721 / 5006† (n=20; no token 0.0%) | 3088 / 4721 / 5006† (n=20; no token 0.0%) | no busy replies |
 
-**First-token medians of 0–1 ms are exact-match cache hits, not model answers.** After the 120b day budget is gone, the overload load repeats questions it already asked, and the cache answers them without a model call: 24 of 42 replies with a token (afternoon), 26 of 46 (evening) and 26 of 44 (shadow mode), each in 2.8 ms or less. The 1 ms busy-reply medians are requests turned away by the arrival check.
+**First-token medians of 0–1 ms are exact-match cache hits, not model answers.** After 120b stops serving drafts, the overload load repeats questions it already asked, and the cache answers them without a model call: 24 of 42 replies with a token (afternoon), 26 of 46 (evening) and 26 of 44 (shadow mode), each in 2.8 ms or less. The 1 ms busy-reply medians are requests turned away by the arrival check.
 
 ### Table 2b: Outcomes, same rows
 
@@ -140,20 +140,20 @@ Evaluated on the stand-in (250 words / 6 pieces / re-rank), with real Groq rows 
 
 | Scenario | Succeeded % (of which unverified %) | Rate-limited % | Timed out or given up % | Errors % | Retries per request | Peak queue length | Tokens per answer | Cost per 1,000 answers |
 |---|---|---|---|---|---|---|---|---|
-| steady — before the 120b day budget is gone (stand-in, afternoon) | 95.6 (6.7) | 4.4 | 0.0 | 0.0 | 0.04 | 2 | 2923 | $0 billed (free tier); $0.448 at paid prices |
-| steady — after the 120b day budget is gone (stand-in, afternoon) | 84.3 (2.0) | 15.7 | 0.0 | 0.0 | 0.02 | 2 | 2373 | $0 billed (free tier); $0.244 at paid prices |
+| steady — before 120b stops serving drafts (stand-in, afternoon) | 95.6 (6.7) | 4.4 | 0.0 | 0.0 | 0.04 | 2 | 2923 | $0 billed (free tier); $0.448 at paid prices |
+| steady — after 120b stops serving drafts (stand-in, afternoon) | 84.3 (2.0) | 15.7 | 0.0 | 0.0 | 0.02 | 2 | 2373 | $0 billed (free tier); $0.244 at paid prices |
 | burst (stand-in, afternoon) | 70.9 (2.3) | 29.1 | 0.0 | 0.0 | 0.05 | 2 | 2507 | $0 billed (free tier); $0.385 at paid prices |
 | burst (stand-in, evening) | 59.3 (1.2) | 36.0 | 0.0 | 4.7 | 0.01 | 2 | 2816 | $0 billed (free tier); $0.426 at paid prices |
-| sustained overload — before the 120b day budget is gone (stand-in, afternoon) | 66.3 (1.2) | 32.6 | 0.0 | 1.2 | 0.06 | 2 | 2705 | $0 billed (free tier); $0.392 at paid prices |
-| sustained overload — after the 120b day budget is gone (stand-in, afternoon) | 84.0 (0.0) | 16.0 | 0.0 | 0.0 | 0.00 | 1 | 1260 | $0 billed (free tier); $0.134 at paid prices |
-| sustained overload — before the 120b day budget is gone (stand-in, evening) | 69.8 (0.0) | 26.7 | 0.6 | 2.9 | 0.02 | 2 | 2543 | $0 billed (free tier); $0.366 at paid prices |
-| sustained overload — after the 120b day budget is gone (stand-in, evening) | 92.0 (2.0) | 8.0 | 0.0 | 0.0 | 0.00 | 1 | 1116 | $0 billed (free tier); $0.116 at paid prices |
-| sustained overload (arrival check in shadow mode) — before the 120b day budget is gone (stand-in, afternoon) | 77.1 (1.1) | 22.9 | 0.0 | 0.0 | 0.03 | 2 | 2351 | $0 billed (free tier); $0.338 at paid prices |
-| sustained overload (arrival check in shadow mode) — after the 120b day budget is gone (stand-in, afternoon) | 93.6 (4.3) | 6.4 | 0.0 | 0.0 | 0.00 | 1 | 995 | $0 billed (free tier); $0.101 at paid prices |
+| sustained overload — before 120b stops serving drafts (stand-in, afternoon) | 66.3 (1.2) | 32.6 | 0.0 | 1.2 | 0.06 | 2 | 2705 | $0 billed (free tier); $0.392 at paid prices |
+| sustained overload — after 120b stops serving drafts (stand-in, afternoon) | 84.0 (0.0) | 16.0 | 0.0 | 0.0 | 0.00 | 1 | 1260 | $0 billed (free tier); $0.134 at paid prices |
+| sustained overload — before 120b stops serving drafts (stand-in, evening) | 69.8 (0.0) | 26.7 | 0.6 | 2.9 | 0.02 | 2 | 2543 | $0 billed (free tier); $0.366 at paid prices |
+| sustained overload — after 120b stops serving drafts (stand-in, evening) | 92.0 (2.0) | 8.0 | 0.0 | 0.0 | 0.00 | 1 | 1116 | $0 billed (free tier); $0.116 at paid prices |
+| sustained overload (arrival check in shadow mode) — before 120b stops serving drafts (stand-in, afternoon) | 77.1 (1.1) | 22.9 | 0.0 | 0.0 | 0.03 | 2 | 2351 | $0 billed (free tier); $0.338 at paid prices |
+| sustained overload (arrival check in shadow mode) — after 120b stops serving drafts (stand-in, afternoon) | 93.6 (4.3) | 6.4 | 0.0 | 0.0 | 0.00 | 1 | 995 | $0 billed (free tier); $0.101 at paid prices |
 | per-minute limit halved (stand-in, afternoon) | 64.3 (0.0) | 35.7 | 0.0 | 0.0 | 0.07 | 1 | 3135 | $0 billed (free tier); $0.451 at paid prices |
 | per-minute limit halved (limit not learned) (stand-in, afternoon) | 60.0 (0.0) | 40.0 | 0.0 | 0.0 | 0.09 | 1 | 3174 | $0 billed (free tier); $0.483 at paid prices |
-| daily budget exhausted — before the 120b day budget is gone (stand-in, afternoon) | 100.0 (0.0) | 0.0 | 0.0 | 0.0 | 0.50 | 1 | 1467 | $0 billed (free tier); $0.155 at paid prices |
-| daily budget exhausted — after the 120b day budget is gone (stand-in, afternoon) | 18.2 (0.0) | 81.8 | 0.0 | 0.0 | 0.00 | 1 | 1489 | $0 billed (free tier); $0.164 at paid prices |
+| daily budget exhausted — before 120b stops serving drafts (stand-in, afternoon) | 100.0 (0.0) | 0.0 | 0.0 | 0.0 | 0.50 | 1 | 1467 | $0 billed (free tier); $0.155 at paid prices |
+| daily budget exhausted — after 120b stops serving drafts (stand-in, afternoon) | 18.2 (0.0) | 81.8 | 0.0 | 0.0 | 0.00 | 1 | 1489 | $0 billed (free tier); $0.164 at paid prices |
 | e2e evening set (real Groq) | 100.0 (8.3) | 0.0 | 0.0 | 0.0 | 0.00 | 1 | 3442 | $0 billed (free tier); $0.587 at paid prices |
 | eval, 250/3 BM25 (real Groq) | 100.0 (5.0) | 0.0 | 0.0 | 0.0 | 0.00 | 1 | 2052 | $0 billed (free tier); $0.341 at paid prices |
 | eval, 250/6 BM25 (real Groq) | 100.0 (5.0) | 0.0 | 0.0 | 0.0 | 0.00 | 1 | 3103 | $0 billed (free tier); $0.502 at paid prices |

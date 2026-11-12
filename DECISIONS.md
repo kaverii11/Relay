@@ -1493,3 +1493,30 @@ tolerance 15 %, hard floor 5 %, pacing_enabled True.
   Table 1 / Table 3 column headers renamed to the brief's exact wording. No empty cells; all 49 table percentages have
   one decimal; "not measured" where unmeasured. Duration (s) kept as the brief's template (K).
 - K: §8 "new to me" is now her point: debugging hard without better results; at n=20 a total cannot show whether a fix worked (v2 fixed Q72, lost Q65 and Q68; v3 never fixed Q80; 9/8/8). Replaces "a quote in the paper does not mean it supports the answer".
+
+## 78. Cancellation closes live streams, never delivers late, keeps estimated cost (reviewer, accepted by K, 2026-11-13)
+Before: the cancel flag (set when a person's patience runs out) was checked only before a model call and during
+limiter / retry sleeps. A stream already running was read to the end, and a reply finished after the person left
+was still delivered as a success. A request that raised killed its worker thread, so `pending` never went back down.
+- **Close the active stream.** `stream_chat(cancel=...)` checks the flag before sending and on every streamed line;
+  once set it stops reading, leaves the `with client.stream(...)` block (httpx closes the response; the rest of the
+  stream is discarded) and returns error_kind "cancelled" with no partial text. call_model never retries it and does
+  not count it as a failure. Why: tokens and per-minute capacity spent for nobody, and a worker held. The one measured
+  give-up shows it: `overload-1-0084@evening`, patience 5.97 s, its draft stream ran on to 7.41 s (raw events).
+- **No late delivery.** `_deliver` and `_busy` check the flag; if set, nothing is sent and the row is gave_up = 1,
+  status timeout, no first token (event `gave_up`, at = before_delivery). Also checked before retrieval and before the
+  redraft. A checked answer made before they left stays in the cache. Why: a reply nobody waits for must not be counted
+  as served. Raw scan of every events file: 0 measured replies (answers or busy) arrived after the person's patience,
+  so no table changes; the measured runs predate this.
+- **Keep the estimated cost.** A cut stream reports no usage, but the provider bills the prompt and what it generated.
+  So the limiter keeps its reservation (no refund) and the 24 h ledger records the estimate, not 0. Same principle as
+  header sync (only ever more conservative): under-counting would cause 429s and could pass the ceiling. Cancelled
+  before sending = nothing spent, settled as usual.
+- **Worker bookkeeping.** try/finally: timer cancelled and `pending` decremented always; an exception gives an error
+  row, a `worker_error` event and a traceback on stderr (not swallowed), and the worker serves the next request.
+- Tests: `scripts/test_cancellation.py`, offline (fake model server, fake passages; no PDFs, no network): cancel before
+  a call / mid-stream / after the check before delivery / not cancelled / HTTP and network errors stay errors /
+  service patience timer and a raising request. Against the old code, the mid-stream, before-delivery and service tests fail.
+- Same pass, wording only: write-up ladder (250/3 skips the fewer-pieces rung, goes to 20b), Table 2a/2b phase labels
+  "before / after 120b stops serving drafts" (always the 20 % reserve, not the quota used up), retry budget 10 % with a
+  floor of 2, p50 3.2 s = answers only (n=8), 55 of the 60-question pool. Writing still 2 pages; verify 357/0.

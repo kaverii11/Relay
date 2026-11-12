@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 from dataclasses import dataclass, field
 
@@ -31,7 +32,7 @@ class CallResult:
     tokens_out: int = 0
     headers: dict = field(default_factory=dict)   # x-ratelimit-*, retry-after, etc.
     error_body: str = ""
-    error_kind: str = ""        # "", "timeout", "network", "http", "truncated"
+    error_kind: str = ""        # "", "timeout", "network", "http", "truncated", "cancelled" (the person gave up)
 
 
 def _keep_headers(h: httpx.Headers) -> dict:
@@ -43,8 +44,14 @@ def _keep_headers(h: httpx.Headers) -> dict:
 
 def stream_chat(messages, model, *, base_url=GROQ_BASE, api_key=None, max_tokens=400,
                 temperature=0.0, timeout_s=30.0, client: httpx.Client | None = None,
-                extra=None) -> CallResult:
-    """One streaming chat call (Groq or the stand-in), timing the first answer token. Timeouts and HTTP errors come back in the result (error_kind), not as exceptions."""
+                extra=None, cancel: threading.Event | None = None) -> CallResult:
+    """One streaming chat call (Groq or the stand-in), timing the first answer token. Timeouts and HTTP errors come back in the result (error_kind), not as exceptions.
+
+    cancel: the request's cancel flag (set when the person's patience runs out). Checked before the request is sent
+    and on every streamed line; once set, reading stops, leaving the `with client.stream(...)` block closes the
+    response (the unread rest of the stream is discarded and the connection is not reused), and the result comes back
+    with error_kind "cancelled" and no text. A stream that sends nothing at all is only noticed at its next line or
+    its read timeout; Groq streams reasoning deltas, so lines arrive continuously while the model works."""
     api_key = api_key or os.environ.get("GROQ_API_KEY", "")
     body = {"model": model, "messages": messages, "max_tokens": max_tokens,
             "temperature": temperature, "stream": True,
@@ -55,6 +62,11 @@ def stream_chat(messages, model, *, base_url=GROQ_BASE, api_key=None, max_tokens
     client = client or httpx.Client(timeout=None)
     t0 = time.perf_counter()
     res = CallResult(status=0)
+    if cancel is not None and cancel.is_set():       # gave up before the request went out: send nothing
+        res.error_kind = "cancelled"
+        if own:
+            client.close()
+        return res
     try:
         with client.stream("POST", f"{base_url}/chat/completions", json=body,
                            headers={"Authorization": f"Bearer {api_key}"},
@@ -68,6 +80,9 @@ def stream_chat(messages, model, *, base_url=GROQ_BASE, api_key=None, max_tokens
             parts, rparts = [], []
             got_done = False
             for line in r.iter_lines():
+                if cancel is not None and cancel.is_set():
+                    res.error_kind = "cancelled"
+                    break
                 if time.perf_counter() - t0 > timeout_s:
                     res.error_kind = "timeout"
                     break
@@ -98,6 +113,8 @@ def stream_chat(messages, model, *, base_url=GROQ_BASE, api_key=None, max_tokens
                         if res.ttft_ms is None:
                             res.ttft_ms = (time.perf_counter() - t0) * 1000
                         parts.append(piece)
+            if res.error_kind == "cancelled":
+                return res                     # partial text is never returned; `with` closes the response
             res.text = "".join(parts)
             res.reasoning = "".join(rparts)
             if not got_done and not res.error_kind:

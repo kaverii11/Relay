@@ -123,8 +123,8 @@ def main(path):
         src = r["source"] + (f", {r['standin_profile']}" if r.get("standin_profile") else "")
         key = (lab, src, r["retrieval_setting"])
         ph = r.get("daily_phase") or ""
-        if len(phases[key]) > 1:            # K §44: split only where the run crossed the 120b day budget
-            lab += f" ({ph} 120b day budget gone)"
+        if len(phases[key]) > 1:            # K §44: split only where 120b stopped serving drafts (the 20 % reserve or a per-day 429)
+            lab += f" ({ph} 120b stops serving drafts)"
         by[(lab, src, r["retrieval_setting"])].append(r)
 
     print("\nTable 2a: latency (ms). Percentiles over requests that got a reply; no-token share of all requests in the cell")

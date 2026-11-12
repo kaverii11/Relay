@@ -202,7 +202,7 @@ def test_tables():
             tables.main(str(path))
         return out.getvalue()
     before, after = run(base), run(base + fake)
-    lab = "steady (before 120b day budget gone)"
+    lab = "steady (before 120b stops serving drafts)"
     a0, a1 = _table_rows(before, "Table 2a", lab), _table_rows(after, "Table 2a", lab)
     assert a1[3] == str(len(steady) + 4), a1[3]                          # requests sent: every row counts
     assert a0[6:9] == a1[6:9], (a0[6:9], a1[6:9])                        # first token, total, busy: unchanged

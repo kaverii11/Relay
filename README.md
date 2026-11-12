@@ -80,6 +80,8 @@ python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
 echo "GROQ_API_KEY=..." > .env                     # only for runs against real Groq; never committed
 ```
 
+The PDFs are deliberately not packaged: `library/fetch_papers.py` downloads them from arXiv. Run it before
+`scripts/test_guardrails.py` (its pipeline tests build the chunk files from the PDFs) or anything that retrieves.
 Everything that recomputes a table reads files only and makes no network call.
 
 ## Ask it a question
@@ -158,7 +160,9 @@ sends nothing) and `--go`; each `--go` was approved by K after its plan.
 ## Guardrails (security, scale, tokens)
 
 What protects the key, the daily budget and the service, and how each one is tested.
-`scripts/test_guardrails.py` and `scripts/test_pacing.py` run offline: no tokens, and the real ledger is never touched.
+`scripts/test_guardrails.py`, `scripts/test_pacing.py` and `scripts/test_cancellation.py` run offline: no tokens, and the
+real ledger is never touched. `test_guardrails.py` needs the PDFs (`library/fetch_papers.py`, see Setup);
+`test_cancellation.py` uses a fake model server and fake passages, so it needs neither the PDFs nor the network.
 
 | Risk | Guardrail | Where |
 |---|---|---|
@@ -170,7 +174,8 @@ What protects the key, the daily budget and the service, and how each one is tes
 | Hostile or huge input | control characters stripped; empty or > 1,000 characters gets a fixed reply with no model call | `guard.py` |
 | Prompt injection | every claim must quote a passage word for word (code check) and pass the 20b check; the worst outcome is a refusal or "couldn't verify", never an unchecked answer | `pipeline.py` |
 | Overload | own limiter predicts 429s; deadline turns hopeless waits into a busy reply with an ETA; optional `max_queue` sheds at the door; bounded LRU cache | `limiter.py`, `service.py` |
-| Retry storms | retries capped per question and at 10 % of the last minute's requests, with jitter | `pipeline.py`, `limiter.py` |
+| Retry storms | retries capped per question and at 10 % of the last minute's requests (floor of 2), with jitter | `pipeline.py`, `limiter.py` |
+| Work for people who left | when patience runs out, the live model stream is closed, no new call / retry / redraft starts, and no late reply is sent (row: given up); a worker survives a request that raises | `llm.py`, `pipeline.py`, `service.py` |
 
 To run as several instances, the next step is to move the limiter's buckets and the ledger into one shared store
 (Redis or Postgres), so every instance spends from the same Groq budget, and to put auth and per-user quotas at
@@ -187,7 +192,7 @@ an API gateway. Neither is built: today the service is a library driven by scrip
 | `analysis/` | tables and summaries, from raw files only |
 | `probe/` | real-service probe script, findings, raw logs |
 | `raw/` | every run's results, event logs (one JSON line per request with every step), meta files, reading files |
-| `scripts/` | `ask.py` (one question), `assemble_results.py`, `relabel_from_events.py`, `verify_writeup.py`, `check_numbers.py`, `render_writeup.sh`, `package.sh` (builds the Drive folder), `redact_org.py`, `check_secrets.sh`, `test_guardrails.py`, `test_pacing.py` (offline tests, no tokens) |
+| `scripts/` | `ask.py` (one question), `assemble_results.py`, `relabel_from_events.py`, `verify_writeup.py`, `check_numbers.py`, `render_writeup.sh`, `package.sh` (builds the Drive folder), `redact_org.py`, `check_secrets.sh`, `test_guardrails.py`, `test_pacing.py`, `test_cancellation.py` (offline tests, no tokens) |
 | `library/` | `fetch_papers.py`: the three PDFs at their pinned versions |
 
 The Groq key lives only in `.env` (not committed, not in the submission). `scripts/redact_org.py` replaced the

@@ -43,7 +43,7 @@ EXPECTED_PRE_DRAFT_MS = 800
 
 
 class Cancelled(Exception):
-    """The person gave up (their patience ran out)."""
+    """The person gave up (their patience ran out). args[0], if given, says where it was noticed."""
 
 
 class Busy(Exception):
@@ -167,7 +167,7 @@ class Ctx:
             return
         self.ev(why + "_start", seconds=round(s, 3))
         if self.cancel.wait(s):
-            raise Cancelled()
+            raise Cancelled(why)
         self.ev(why + "_end")
 
 
@@ -225,8 +225,8 @@ class Pipeline:
         n_in = est_tokens(messages)
         attempt = 0
         while True:
-            if ctx.cancel.is_set():
-                raise Cancelled()
+            if ctx.cancel.is_set():              # before every call, retry and redraft: nothing new is started
+                raise Cancelled("before_call")
             left_ms = ctx.deadline_ms - ctx.ms()
             max_wait = max(0.0, (left_ms - EXPECTED_WORK_MS.get(kind, 550)) / 1000)
             if kind == "draft" and ctx.draft_ready_ms is None:
@@ -258,11 +258,16 @@ class Pipeline:
                    limiter_wait_s=round(wait, 3), limiter_binding=binding)     # K §34: limiter wait per call
             r = stream_chat(messages, model, base_url=self.base_url, api_key=self.api_key,
                             max_tokens=self._max_tokens(kind), timeout_s=timeout,
-                            client=self.http, extra=extra)
+                            client=self.http, extra=extra, cancel=ctx.cancel)
+            # A stream cut by cancellation reports no usage, though the provider bills what it generated: keep the
+            # limiter's estimate (no refund) and count the estimate in the ledger. Cancelled before sending = nothing spent.
+            cut = r.error_kind == "cancelled" and r.status != 0
             self.lim.sync(model, r.headers)
-            self.lim.settle(model, out_est, r.tokens_out, r.tokens_in)   # actual_in: logs the spend for pacing
+            if not cut:
+                self.lim.settle(model, out_est, r.tokens_out, r.tokens_in)   # actual_in: logs the spend for pacing
             if self.budget is not None:
-                self.budget.record(model, r.tokens_in, r.tokens_out, r.status)
+                self.budget.record(model, r.tokens_in or (n_in if cut else 0),
+                                   r.tokens_out or (out_est if cut else 0), r.status)
             ctx.tokens_in += r.tokens_in
             ctx.tokens_out += r.tokens_out          # completion_tokens: reasoning is inside it (measured, stage 1)
             ctx.tokens_cached += r.cached_tokens
@@ -274,6 +279,8 @@ class Pipeline:
                    err=r.error_kind, limit=lk, first_any_ms=r.first_any_ms, ttft_ms=r.ttft_ms,
                    work_ms=round(r.total_ms, 1), tokens_in=r.tokens_in, tokens_out=r.tokens_out,
                    cached_tokens=r.cached_tokens, retry_after=r.headers.get("retry-after"))
+            if r.error_kind == "cancelled":           # never retried, never treated as a failure
+                raise Cancelled("stream" if cut else "before_call")
             if r.status == 200 and not r.error_kind:
                 return r
             # ---- failure: decide whether to retry
@@ -351,6 +358,7 @@ class Pipeline:
                 ctx.ev("understand_skipped", why=type(e).__name__)
                 out["degrade_level"] = "raw_query"
             out["query"] = query
+            self._check_cancel(ctx, "before_retrieve")
 
             # [2] retrieve (tool). gate_input "max" (K §29): score the raw question and the rewrite; the
             # higher cross-encoder score is the gate, and the drafter gets THAT query's passages.
@@ -411,6 +419,8 @@ class Pipeline:
             feedback = None
             rejected = []      # v3 change A: (passage index, quote key) of claims the model check rejected
             for round_ in range(2):
+                if round_:
+                    self._check_cancel(ctx, "before_redraft")
                 try:
                     r = self.call_model(ctx, model, draft_messages(ctx.question, use, feedback, variant=self.p.draft_prompt), "draft",
                                         out_est=DRAFT_OUT_EST)
@@ -458,9 +468,9 @@ class Pipeline:
                     return self._deliver(ctx, out, "ok")
                 feedback = why
             return self._unverified(ctx, out, use)
-        except Cancelled:
-            ctx.ev("gave_up")
-            return self._finish(ctx, out, "timeout", gave_up=True)
+        except Cancelled as e:
+            ctx.ev("gave_up", at=e.args[0] if e.args else "")
+            return self._late(ctx, out)
         except Busy as e:
             return self._busy(ctx, out, e.limit_kind, e.eta_s)
         except DailyLimit as e:
@@ -471,6 +481,12 @@ class Pipeline:
         finally:
             with self.qlock:
                 self.queued_drafts.discard(ctx.rid)
+
+    @staticmethod
+    def _check_cancel(ctx, where):
+        """Stop here if the person has given up (call_model also checks before every call and retry)."""
+        if ctx.cancel.is_set():
+            raise Cancelled(where)
 
     # ------------------------------------------------------------------ decide helpers
     def _arrival_predict(self, ctx):
@@ -673,6 +689,9 @@ class Pipeline:
 
     def _busy(self, ctx, out, limit_kind, eta_s, path="mid"):
         """The busy reply, filled by code (no model call): which limit, and when to ask again."""
+        if ctx.cancel.is_set():
+            ctx.ev("gave_up", at="before_delivery", dropped="busy")
+            return self._late(ctx, out)
         ctx.busy_path = path
         eta = "under a minute" if eta_s < 60 else (f"about {math.ceil(eta_s / 60)} min" if eta_s < 3600
                                                     else f"about {eta_s / 3600:.1f} h")
@@ -687,9 +706,19 @@ class Pipeline:
         return self._finish(ctx, out, "rate_limited", first_token=False)
 
     def _deliver(self, ctx, out, status):
-        """Send the reply: first token = now (the whole checked reply goes at once)."""
+        """Send the reply: first token = now (the whole checked reply goes at once). If the person gave up while it
+        was being made, nothing is sent (a late answer is never delivered)."""
+        if ctx.cancel.is_set():
+            ctx.ev("gave_up", at="before_delivery", dropped=out.get("kind") or "")
+            return self._late(ctx, out)
         ctx.ev("first_token")
         return self._finish(ctx, out, status, first_token=True)
+
+    def _late(self, ctx, out):
+        """The person gave up: no reply is sent, the row counts as given up (status timeout, no first token).
+        A checked answer made before they left stays in the cache for the next identical question."""
+        out.update(kind="", answer="", citations=[])
+        return self._finish(ctx, out, "timeout", gave_up=True)
 
     def _finish(self, ctx, out, status, first_token=False, gave_up=False):
         """Close the request: status, timings, counters and events for the CSV row and the log."""

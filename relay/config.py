@@ -69,7 +69,7 @@ class Policy:
                                            # gate and the drafter gets that query's passages. "rewrite": rewrite only.
     # --- retries (DECISIONS §3)
     max_retries_per_question: int = 2
-    retry_budget_fraction: float = 0.10    # PLACEHOLDER: retries <= 10% of requests in last 60 s
+    retry_budget_fraction: float = 0.10    # PLACEHOLDER: retries <= max(2, 10% of requests in last 60 s)
     retry_jitter: str = "jitter"           # "exact" | "jitter" (DECISIONS §18 experiment)
     backoff_base_ms: float = 250           # 5xx / timeout backoff base (full jitter)
     call_timeout_short_s: float = 8.0      # understand / check

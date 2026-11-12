@@ -1,7 +1,8 @@
 """Queue + workers around the pipeline, and the results.csv row format.
 
 Arrivals go into a FIFO queue; `workers` threads serve them. Each person has a patience
-timer: when it fires, their cancel flag is set and the pipeline stops spending tokens on them.
+timer: when it fires, their cancel flag is set: a model stream in progress is closed, no new call, retry or redraft
+starts, and no reply is sent to them afterwards (the row is gave_up = 1, status timeout).
 A request still queued at the system deadline gets the busy reply without being served.
 Load shedding (K, 2026-11-12, hardening): with max_queue set, an arrival that finds that many requests already
 waiting gets the busy reply at once (busy_path "shed") instead of joining a queue it can't get through in time.
@@ -15,6 +16,7 @@ import json
 import queue
 import threading
 import time
+import traceback
 from pathlib import Path
 
 from relay.pipeline import Ctx, Pipeline
@@ -69,21 +71,33 @@ class Service:
         """Worker thread: take the next request, run the pipeline, record the row."""
         while True:
             rid, question, t0, wall, cancel, timer, patience = self.q.get()
-            ctx = Ctx(rid=rid, question=question, t0=t0, cancel=cancel, deadline_ms=self.pl.p.system_deadline_ms)
-            ctx.ev("arrive", patience_s=round(patience, 2))
-            if cancel.is_set():                       # gave up while still queued
-                ctx.ev("gave_up_in_queue")
-                res = self.pl._finish(ctx, {"degrade_level": "none", "model": ""}, "timeout", gave_up=True)
-            elif ctx.ms() > ctx.deadline_ms:          # waited past the deadline: busy, not served
-                res = self.pl._busy(ctx, {"degrade_level": "none", "model": ""}, "queue", 5.0, path="queue")
-            else:
-                ctx.ev("dequeued")
-                res = self.pl.run(ctx)
-            timer.cancel()
-            self._record(rid, question, wall, res)
-            with self.done:
-                self.pending -= 1
-                self.done.notify_all()
+            ctx = None
+            try:
+                ctx = Ctx(rid=rid, question=question, t0=t0, cancel=cancel, deadline_ms=self.pl.p.system_deadline_ms)
+                ctx.ev("arrive", patience_s=round(patience, 2))
+                if cancel.is_set():                       # gave up while still queued
+                    ctx.ev("gave_up_in_queue")
+                    res = self.pl._finish(ctx, {"degrade_level": "none", "model": ""}, "timeout", gave_up=True)
+                elif ctx.ms() > ctx.deadline_ms:          # waited past the deadline: busy, not served
+                    res = self.pl._busy(ctx, {"degrade_level": "none", "model": ""}, "queue", 5.0, path="queue")
+                else:
+                    ctx.ev("dequeued")
+                    res = self.pl.run(ctx)
+                self._record(rid, question, wall, res)
+            except Exception as e:    # noqa: BLE001 - a bug in one request must not kill this worker or hang wait_all
+                traceback.print_exc()                     # reported, not hidden: stderr + an error row with the exception
+                try:
+                    ctx = ctx or Ctx(rid=rid, question=question, t0=t0, cancel=cancel,
+                                     deadline_ms=self.pl.p.system_deadline_ms)
+                    ctx.ev("worker_error", error=repr(e)[:500])
+                    self._record(rid, question, wall, self.pl._finish(ctx, {"degrade_level": "none", "model": ""}, "error"))
+                except Exception:   # noqa: BLE001
+                    traceback.print_exc()
+            finally:
+                timer.cancel()
+                with self.done:
+                    self.pending -= 1
+                    self.done.notify_all()
 
     def _record(self, rid, question, wall, res):
         """Turn one pipeline result into a results.csv row (and its event-log line)."""

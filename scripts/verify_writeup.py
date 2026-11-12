@@ -88,7 +88,7 @@ def main():
         sc, prof = label(r)
         k = (sc, prof, r["retrieval_setting"])
         if len(phases[k]) > 1:
-            sc += " — before the 120b day budget is gone" if r["daily_phase"] == "before" else " — after the 120b day budget is gone"
+            sc += " — before 120b stops serving drafts" if r["daily_phase"] == "before" else " — after 120b stops serving drafts"
         groups[(sc, prof)].append(r)
     md = (ROOT / "writeup/writeup.md").read_text()
 
