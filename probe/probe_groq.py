@@ -25,6 +25,7 @@ import pymupdf
 from dotenv import load_dotenv
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from relay import ledger  # noqa: E402
 from relay.llm import GROQ_BASE, stream_chat  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -73,13 +74,13 @@ _lock = __import__("threading").Lock()
 
 def _spend_one():
     """Count every request before it is sent; refuse past the cap. Persisted across runs."""
-    with _lock:
-        d = json.loads(LEDGER.read_text()) if LEDGER.exists() else {}
+    with _lock, ledger.locked():          # shared with relay/budget.py: cross-process lock, atomic write
+        d = ledger.read()
         n = d.get("sent", 0)
         if n >= HARD_CAP:
             raise SystemExit(f"probe hard cap reached ({n}/{HARD_CAP}) - raise HARD_CAP deliberately")
         d["sent"] = n + 1                 # other keys (relay/budget.py "calls") are kept
-        LEDGER.write_text(json.dumps(d))
+        ledger.write(d)
 
 
 def call(log, model, n_chars, max_tokens, tag, client=None, messages=None, extra=None, meta=None):

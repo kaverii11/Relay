@@ -5,7 +5,9 @@ through the production pipeline get, instead:
   - a per-RUN request cap, printed by --plan and approved by K before --go;
   - a per-MODEL daily token ceiling: 170k of Groq's 200k TPD, over a rolling 24 h window. Groq refills
     continuously (measured for RPD, stage 1), so a rolling window is the conservative reading.
-Both are checked BEFORE a request is sent. A hit raises DailyLimit(model, "budget"): the pipeline treats
+Both are checked BEFORE a request is sent. Hardening (K, 2026-11-12): calls that passed the check but haven't
+reported their tokens yet count as in flight, so parallel workers can't all pass the same check at once; the ledger
+is locked and written atomically (relay/ledger.py); an unreadable ledger refuses spending (fail closed). A hit raises DailyLimit(model, "budget"): the pipeline treats
 it like Groq's own per-day limit (ladder to the other model, or the busy reply) and the run script stops
 submitting (`stopped`).
 
@@ -21,16 +23,18 @@ import argparse
 import datetime as dt
 import json
 import threading
-from pathlib import Path
+import time
 
+from relay import ledger
 from relay.config import BIG, SMALL
+from relay.ledger import LEDGER, ROOT, LedgerCorrupt
 from relay.pipeline import DailyLimit
 
-ROOT = Path(__file__).resolve().parents[1]
-LEDGER = ROOT / "probe/raw/ledger.json"
 TPD = 200_000
 CEILING = 170_000          # K: stop at 170k of 200k
 WINDOW_H = 24
+INFLIGHT_TTL_S = 120       # a reservation never recorded (call not sent, or crashed) stops counting after this;
+                           # longer than any call's timeout (draft 15 s) plus its limiter wait (<= the 8 s deadline)
 
 
 def _now():
@@ -39,8 +43,8 @@ def _now():
 
 
 def _read():
-    """The ledger file as a dict (empty if it doesn't exist yet)."""
-    return json.loads(LEDGER.read_text()) if LEDGER.exists() else {}
+    """The ledger file as a dict (empty if it doesn't exist yet; LedgerCorrupt if it can't be parsed)."""
+    return ledger.read()
 
 
 def usage_24h(d=None, now=None):
@@ -65,31 +69,58 @@ class Budget:
         self.run, self.request_cap, self.ceiling = run, request_cap, ceiling
         self.run_sent, self.stopped = 0, None
         self.lock = threading.Lock()
+        # check-then-act fix: estimates of calls that passed reserve() but haven't been recorded yet, per model,
+        # oldest first: [(monotonic time, tokens)]. Without this, 16 workers reading the ledger at the same moment
+        # would all see the same headroom and all pass.
+        self.inflight: dict[str, list[tuple[float, int]]] = {}
+
+    def _inflight(self, model) -> int:
+        """Tokens reserved but not yet recorded for this model (stale reservations dropped)."""
+        now = time.monotonic()
+        live = [x for x in self.inflight.get(model, []) if now - x[0] < INFLIGHT_TTL_S]
+        self.inflight[model] = live
+        return sum(t for _, t in live)
 
     def reserve(self, model, est_in, est_out):
-        """Before a real call: refuse (DailyLimit) if the run cap or the 24 h ceiling would be passed."""
+        """Before a real call: refuse (DailyLimit) if the run cap or the 24 h ceiling would be passed,
+        counting calls still in flight. An unreadable ledger refuses too (fail closed)."""
         with self.lock:
             if self.run_sent >= self.request_cap:
                 self.stopped = self.stopped or f"run request cap {self.request_cap} reached"
                 raise DailyLimit(model, "budget")
-            used = usage_24h()[model]["tokens"]
-            if used + est_in + est_out > self.ceiling:
-                self.stopped = self.stopped or (f"{model}: {used} tokens in the last 24 h + ~{est_in + est_out} "
-                                                f"would pass the {self.ceiling} ceiling")
+            try:
+                used = usage_24h()[model]["tokens"]
+            except LedgerCorrupt as e:
+                self.stopped = self.stopped or str(e)
+                raise DailyLimit(model, "budget") from e
+            pending = self._inflight(model)
+            if used + pending + est_in + est_out > self.ceiling:
+                self.stopped = self.stopped or (f"{model}: {used} tokens in the last 24 h + {pending} in flight "
+                                                f"+ ~{est_in + est_out} would pass the {self.ceiling} ceiling")
                 raise DailyLimit(model, "budget")
             self.run_sent += 1
+            self.inflight.setdefault(model, []).append((time.monotonic(), est_in + est_out))
 
     def record(self, model, tokens_in, tokens_out, status):
-        """After a real call: append it to the ledger so later runs see it in the 24 h window."""
+        """After a real call: append it to the ledger (locked, atomic) and release its in-flight reservation."""
         with self.lock:
-            d = _read()
-            d.setdefault("calls", []).append([_now().isoformat(timespec="seconds"), model,
-                                              tokens_in or 0, tokens_out or 0, self.run, status])
-            LEDGER.write_text(json.dumps(d))
+            if self.inflight.get(model):
+                self.inflight[model].pop(0)          # calls of one model are interchangeable for the total
+            with ledger.locked():
+                d = _read()
+                d.setdefault("calls", []).append([_now().isoformat(timespec="seconds"), model,
+                                                  tokens_in or 0, tokens_out or 0, self.run, status])
+                ledger.write(d)
 
 
 def backfill():
     """Add probe/raw/*.jsonl calls (probes, rewrites) to the ledger so the 24 h window counts them."""
+    with ledger.locked():
+        return _backfill()
+
+
+def _backfill():
+    """backfill() body, run under the ledger lock."""
     d = _read()
     calls = d.setdefault("calls", [])
     seen = {tuple(c[:4]) for c in calls}
@@ -113,7 +144,7 @@ def backfill():
             calls.append([*key, f.stem, r.get("status")])
             added += 1
     calls.sort()
-    LEDGER.write_text(json.dumps(d))
+    ledger.write(d)
     return added
 
 

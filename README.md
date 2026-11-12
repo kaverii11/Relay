@@ -125,18 +125,38 @@ sends nothing) and `--go`; each `--go` was approved by K after its plan.
     `scripts/check_numbers.py` (every number in the prose has a source), `sh scripts/render_writeup.sh`
     (writeup/writeup.pdf; prints the page count of the writing).
 
+## Guardrails (security, scale, tokens)
+
+What protects the key, the daily budget and the service, and how each one is tested.
+`.venv/bin/python scripts/test_guardrails.py` runs offline: no tokens, and the real ledger is never touched.
+
+| Risk | Guardrail | Where |
+|---|---|---|
+| Key leaks | key only in `.env` (gitignored); org id redacted from logs; `check_secrets.sh` before upload | `scripts/` |
+| One question costs too much | output caps per call (draft 800, others 400); at most 1 redraft and 2 retries; cache first | `pipeline.py` |
+| The day runs out | 170k-of-200k ceiling per model over a rolling 24 h, checked **before** each call, counting calls still in flight; 20 % reserve switches drafts to 20b | `budget.py`, `pipeline.py` |
+| Two processes or a crash corrupt the count | ledger locked across processes, written atomically; an unreadable ledger refuses spending (fail closed) | `ledger.py` |
+| Hostile or huge input | control characters stripped; empty or > 1,000 characters gets a fixed reply with no model call | `guard.py` |
+| Prompt injection | every claim must quote a passage word for word (code check) and pass the 20b check; the worst outcome is a refusal or "couldn't verify", never an unchecked answer | `pipeline.py` |
+| Overload | own limiter predicts 429s; deadline turns hopeless waits into a busy reply with an ETA; optional `max_queue` sheds at the door; bounded LRU cache | `limiter.py`, `service.py` |
+| Retry storms | retries capped per question and at 10 % of the last minute's requests, with jitter | `pipeline.py`, `limiter.py` |
+
+To run as several instances, the next step is to move the limiter's buckets and the ledger into one shared store
+(Redis or Postgres), so every instance spends from the same Groq budget, and to put auth and per-user quotas at
+an API gateway. Neither is built: today the service is a library driven by scripts on one machine (DECISIONS §70).
+
 ## Layout
 
 | Path | What |
 |---|---|
-| `relay/` | the service: `pipeline.py` (understand -> retrieve -> decide -> draft -> check, one redraft), `limiter.py` (refill-formula limiter fed by Groq's headers), `retrieval.py` (BM25 + MiniLM cross-encoder), `ingest.py` (section-aware chunks with citations), `prompts.py`, `config.py` (every tunable number), `service.py` (queue, workers, CSV rows), `budget.py` (request caps + 24 h ledger) |
+| `relay/` | the service: `pipeline.py` (understand -> retrieve -> decide -> draft -> check, one redraft), `limiter.py` (refill-formula limiter fed by Groq's headers), `retrieval.py` (BM25 + MiniLM cross-encoder), `ingest.py` (section-aware chunks with citations), `prompts.py`, `config.py` (every tunable number), `service.py` (queue, workers, CSV rows), `budget.py` (request caps + 24 h token ceiling), `ledger.py` (locked, atomic ledger file), `guard.py` (input checks) |
 | `standin/` | the calibrated fake Groq (same streaming API and 429 bodies) |
 | `load/` | load generator, scenarios, the question mix |
 | `eval/` | questions, rewrites, gate/cutoff analysis, end-to-end and eval runners, replay, grading tools |
 | `analysis/` | tables and summaries, from raw files only |
 | `probe/` | real-service probe script, findings, raw logs |
 | `raw/` | every run's results, event logs (one JSON line per request with every step), meta files, reading files |
-| `scripts/` | `ask.py` (one question), `assemble_results.py`, `relabel_from_events.py`, `verify_writeup.py`, `check_numbers.py`, `render_writeup.sh`, `package.sh` (builds the Drive folder), `redact_org.py`, `check_secrets.sh` |
+| `scripts/` | `ask.py` (one question), `assemble_results.py`, `relabel_from_events.py`, `verify_writeup.py`, `check_numbers.py`, `render_writeup.sh`, `package.sh` (builds the Drive folder), `redact_org.py`, `check_secrets.sh`, `test_guardrails.py` (offline guardrail tests) |
 | `library/` | `fetch_papers.py`: the three PDFs at their pinned versions |
 
 The Groq key lives only in `.env` (not committed, not in the submission). `scripts/redact_org.py` replaced the

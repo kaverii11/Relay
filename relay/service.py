@@ -3,6 +3,9 @@
 Arrivals go into a FIFO queue; `workers` threads serve them. Each person has a patience
 timer: when it fires, their cancel flag is set and the pipeline stops spending tokens on them.
 A request still queued at the system deadline gets the busy reply without being served.
+Load shedding (K, 2026-11-12, hardening): with max_queue set, an arrival that finds that many requests already
+waiting gets the busy reply at once (busy_path "shed") instead of joining a queue it can't get through in time.
+None (the default, and every measured run) = unbounded, as Tables 2a/2b were measured.
 """
 from __future__ import annotations
 
@@ -22,7 +25,7 @@ COLUMNS = ["request_id", "scenario", "source", "start_time", "first_token_ms", "
            "service_start_ms", "gave_up", "degrade_level", "model", "calls",
            "tokens_in_120b", "tokens_out_120b", "tokens_in_20b", "tokens_out_20b", "rerank_ms",
            "limiter_wait_ms", "tokens_cached",   # K §41: our limiter's waits (Table 3 excludes them); Groq cached prompt tokens
-           "reply_kind",   # answer | refusal | unverified (K §44: check failed twice) | busy | none (gave up / error)
+           "reply_kind",   # answer | refusal | unverified (K §44: check failed twice) | busy | rejected (input guard) | none (gave up / error)
            "draft_ready_ms", "draft_sent_ms", "arrival_pred_draft_sent_ms", "arrival_busy_pred", "busy_path",
            "daily_phase",       # K §44: before | after the 120b day budget stopped serving drafts (reserve reached / per-day 429)
            "run_variant",       # "" = main run; else e.g. shadow / nolearn / evening (tables group by it)
@@ -32,8 +35,9 @@ COLUMNS = ["request_id", "scenario", "source", "start_time", "first_token_ms", "
 class Service:
     """Runs the pipeline for many people at once: a queue, worker threads, patience timers, CSV rows."""
     def __init__(self, pipeline: Pipeline, *, workers: int, scenario: str, events_path: Path,
-                 variant: str = "", profile: str = ""):
+                 variant: str = "", profile: str = "", max_queue: int | None = None):
         self.pl, self.scenario, self.variant, self.profile = pipeline, scenario, variant, profile
+        self.max_queue = max_queue
         self.q: queue.Queue = queue.Queue()
         self.rows, self.lock = [], threading.Lock()
         self.events_f = open(events_path, "a")
@@ -47,6 +51,13 @@ class Service:
         cancel = threading.Event()
         t0 = time.perf_counter()
         wall = dt.datetime.now(dt.timezone.utc)
+        if self.max_queue is not None and self.q.qsize() >= self.max_queue:     # shed: answer busy right away
+            ctx = Ctx(rid=rid, question=question, t0=t0, cancel=cancel, deadline_ms=self.pl.p.system_deadline_ms)
+            ctx.ev("arrive", patience_s=round(patience_s, 2))
+            ctx.ev("shed", queued=self.q.qsize(), max_queue=self.max_queue)
+            res = self.pl._busy(ctx, {"degrade_level": "none", "model": ""}, "queue", 5.0, path="shed")
+            self._record(rid, question, wall, res)
+            return
         timer = threading.Timer(patience_s, cancel.set)
         timer.daemon = True
         timer.start()

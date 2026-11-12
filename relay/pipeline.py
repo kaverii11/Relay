@@ -20,11 +20,13 @@ import random
 import re
 import threading
 import time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 
 import httpx
 
 from relay.config import BIG, PAPER_VERSIONS, SMALL, Policy, RetrievalSetting
+from relay.guard import MAX_QUESTION_CHARS, check_question
 from relay.limiter import Limiter
 from relay.llm import stream_chat
 from relay.prompts import claim_quotes, check_messages, draft_messages, understand_messages
@@ -99,8 +101,10 @@ class ExactCache:
     """Exact match on the normalised question + setting + paper versions. No semantic matching
     (DECISIONS §2: 'Moshi latency' must not hit 'Moshi theoretical latency')."""
 
-    def __init__(self):
-        self.d, self.lock = {}, threading.Lock()
+    MAX_ENTRIES = 4096    # hardening (K, 2026-11-12): bounded, least-recently-used out, so memory can't grow forever
+
+    def __init__(self, max_entries: int = MAX_ENTRIES):
+        self.d, self.lock, self.max = OrderedDict(), threading.Lock(), max_entries
 
     def key(self, q, setting):
         """Cache key: question words + retrieval setting + paper versions (a new paper version misses)."""
@@ -109,12 +113,19 @@ class ExactCache:
     def get(self, q, setting):
         """Cached reply for this question and setting, or None."""
         with self.lock:
-            return self.d.get(self.key(q, setting))
+            k = self.key(q, setting)
+            if k in self.d:
+                self.d.move_to_end(k)        # recently used: evicted last
+            return self.d.get(k)
 
     def put(self, q, setting, value):
         """Store a checked answer (refusals and busy replies are never cached)."""
         with self.lock:
-            self.d[self.key(q, setting)] = value
+            k = self.key(q, setting)
+            self.d[k] = value
+            self.d.move_to_end(k)
+            while len(self.d) > self.max:
+                self.d.popitem(last=False)   # drop the least recently used answer
 
 
 @dataclass
@@ -302,6 +313,10 @@ class Pipeline:
         # K §44 (Table 2a/2b column): at arrival, is the 120b day budget still serving drafts?
         ctx.daily_phase = ("after" if self.daily_hit is not None
                            or self.lim.daily_fraction_left(BIG) < self.p.daily_reserve_fraction else "before")
+        # input guardrail (relay/guard.py): before the cache, retrieval or any model call
+        ctx.question, bad = check_question(ctx.question)
+        if bad:
+            return self._reject(ctx, out, bad)
         try:
             # cache (rung 0)
             if self.p.cache and self.cache:
@@ -621,6 +636,15 @@ class Pipeline:
             f"{cites}."), citations=[h.chunk.cite() for h in use])
         ctx.ev("unverified", cites=len(use))
         return self._deliver(ctx, out, "ok")
+
+    def _reject(self, ctx, out, why):
+        """Input guardrail reply (empty or over-long question), filled by code: no model call, not cached."""
+        out.update(kind="rejected", reject_reason=why, degrade_level="none", answer=(
+            "I can't take that question: " + ("it's empty." if why == "empty" else
+                                              f"it's longer than {MAX_QUESTION_CHARS} characters. ")
+            + ("" if why == "empty" else "Please ask one specific question about the papers.")))
+        ctx.ev("rejected", why=why)
+        return self._deliver(ctx, out, "ok")      # brief enum: a deliberate fixed reply, like a refusal; reply_kind says "rejected"
 
     def _busy(self, ctx, out, limit_kind, eta_s, path="mid"):
         """The busy reply, filled by code (no model call): which limit, and when to ask again."""
