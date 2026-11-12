@@ -12,6 +12,12 @@ with three fixed pieces. Covers:
   6. pipeline: not cancelled -> answer delivered (understand, draft, check), every stream closed
   7. service: patience timer fires mid-stream -> row gave_up = 1, pending back to 0, stream closed
   8. service: a request that raises -> error row, traceback on stderr, pending back to 0, worker serves the next one
+  9. accounting, stream cut: the limiter keeps the reservation (no refund), the estimate enters the pacing spend
+     history, and the run ledger records the estimate
+ 10. accounting, never sent (gave up during the limiter wait, gave up just before sending, turned away by the
+     limiter): run budget (request count + in-flight) and limiter reservations are given back; run_sent always
+     equals the requests that reached the provider
+Ledger writes go to a temporary ledger; the real probe/raw/ledger.json is never touched.
 """
 from __future__ import annotations
 
@@ -30,6 +36,7 @@ import httpx
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from relay import ledger  # noqa: E402
 from relay.config import BIG, SETTINGS, SMALL, Policy  # noqa: E402
 from relay.limiter import Limiter  # noqa: E402
 from relay.llm import stream_chat  # noqa: E402
@@ -37,6 +44,8 @@ from relay.pipeline import Ctx, ExactCache, Pipeline  # noqa: E402
 from relay.prompts import CHECK_SYSTEM, CHECK_SYSTEM_V2, DRAFT_SYSTEM, DRAFT_SYSTEM_V2  # noqa: E402
 
 TMP = Path(tempfile.mkdtemp(prefix="relay_cancel_"))
+ledger.LEDGER = TMP / "ledger.json"           # every ledger call in this process now uses the temp file
+REAL = ROOT / "probe/raw/ledger.json"
 QUOTE = "we employ h = 8 parallel attention layers, or heads"
 PIECES = [f"In this work {QUOTE}. For each of these we use dk = dv = dmodel/h = 64.",
           "The Transformer follows this overall architecture using stacked self-attention.",
@@ -118,11 +127,11 @@ class FakeRetriever:
         return hits, 3.0, {"ce_ms": 1.0, "bm25_top": hits}
 
 
-def pipeline(fake):
+def pipeline(fake, budget=None):
     """The real Pipeline (chosen setting, default Policy) with model calls going to `fake` and the fake retriever."""
     st = SETTINGS["chosen"]
     pl = Pipeline(base_url="http://fake.invalid/v1", api_key="x", source="test", setting=st, policy=Policy(),
-                  limiter=Limiter([SMALL, BIG]), cache=ExactCache(), retriever=FakeRetriever())
+                  limiter=Limiter([SMALL, BIG]), cache=ExactCache(), retriever=FakeRetriever(), budget=budget)
     pl.http.close()
     pl.http = httpx.Client(transport=httpx.MockTransport(fake))
     return pl
@@ -299,8 +308,96 @@ def test_service():
         "-> error row + traceback, pending 0, the same worker answered the next request")
 
 
+# ------------------------------------------------------------------ accounting
+def budget():
+    """A real run Budget on the temporary ledger."""
+    from relay.budget import Budget
+    return Budget(run="test_cancellation", request_cap=50)
+
+
+def ledger_calls():
+    """Calls recorded in the temporary ledger."""
+    return ledger.read().get("calls", []) if ledger.LEDGER.exists() else []
+
+
+def test_cut_accounting():
+    """A stream cut mid-draft: no refund, estimate in the pacing history and the ledger."""
+    holder = {}
+
+    def draft():
+        s = FakeStream(sse(json.dumps(DRAFT), pieces=12), before_chunk=lambda i: holder["ctx"].cancel.set() if i == 2 else None)
+        return s
+    bud, n0 = budget(), len(ledger_calls())
+    fake = FakeGroq(draft=draft)
+    pl, ctx = pipeline(fake, bud), ctx_for()
+    holder["ctx"] = ctx
+    res = pl.run(ctx)
+    assert gave_up_at(res) == "stream", gave_up_at(res)
+    est_in = next(e["est_in"] for e in res["events"] if e["ev"] == "call_start" and e["step"] == "draft")
+    est = est_in + 350                                                     # pipeline.DRAFT_OUT_EST
+    big = pl.lim.b[BIG]
+    assert big["tpm"].remaining() <= 8000 - est + 50, (big["tpm"].remaining(), est)   # reservation kept (<=50 refilled)
+    assert big["tpd"].remaining() <= 200000 - est + 1, big["tpd"].remaining()
+    spent = [t for _, t in pl.lim.spend[BIG]]
+    assert spent == [est], (spent, est)                                    # pacing sees the cut draft's estimate
+    over, cur, allowed = pl.lim.check_pacing(BIG, 300, 0.15)
+    assert abs(cur - est / 300) < 1e-9, cur
+    rec = ledger_calls()[n0:]
+    assert [c[1] for c in rec] == [SMALL, BIG], rec                        # understand (actual) + the cut draft
+    assert rec[1][2] + rec[1][3] == est, rec[1]                            # the cut draft at its estimate, not 0
+    assert bud.run_sent == 2 and len(fake.calls) == 2 and not bud.inflight.get(BIG), (bud.run_sent, bud.inflight)
+    _ok(f"accounting, stream cut: 120b reservation kept, {est} estimated tokens in the pacing history "
+        f"(current {cur:.2f} tok/s) and in the ledger")
+
+
+def test_never_sent_releases():
+    """Reservations of calls that never reach the provider are given back; run_sent = requests actually sent."""
+    # (a) gave up during the limiter wait, five times in a row: nothing sent, nothing kept
+    bud, n0 = budget(), len(ledger_calls())
+    for i in range(5):
+        fake = FakeGroq()
+        pl, ctx = pipeline(fake, bud), ctx_for()
+        pl.lim.b[SMALL]["rpm"].used = 30.0                                # per-minute full: understand waits ~2 s
+        threading.Timer(0.1, ctx.cancel.set).start()
+        res = pl.run(ctx)
+        assert gave_up_at(res) == "waiting" and fake.calls == [] and res["calls"] == 0, (gave_up_at(res), fake.calls)
+        small = pl.lim.b[SMALL]
+        assert small["rpd"].used < 1e-6 and small["tpd"].used < 1e-6, (small["rpd"].used, small["tpd"].used)
+        assert small["rpm"].used <= 30.0, small["rpm"].used
+    assert bud.run_sent == 0 and not bud.inflight.get(SMALL) and len(ledger_calls()) == n0, (bud.run_sent, bud.inflight)
+
+    # (b) gave up after the wait, just before the request went out: nothing sent, nothing recorded
+    fake = FakeGroq()
+    pl, ctx = pipeline(fake, bud), ctx_for()
+    real_note = pl.lim.note_request
+    pl.lim.note_request = lambda is_retry: (real_note(is_retry), ctx.cancel.set())   # last step before stream_chat
+    res = pl.run(ctx)
+    assert gave_up_at(res) == "before_call" and fake.calls == [] and res["calls"] == 0, (gave_up_at(res), fake.calls, res["calls"])
+    assert pl.lim.b[SMALL]["rpd"].used < 1e-6 and bud.run_sent == 0 and len(ledger_calls()) == n0
+    assert next(e for e in res["events"] if e["ev"] == "call_end").get("sent") is False
+
+    # (c) turned away by our limiter (Busy): the run budget's reservation is given back too
+    fake = FakeGroq()
+    pl, ctx = pipeline(fake, bud), ctx_for()
+    pl.lim.b[SMALL]["rpm"].used = 1000.0                              # 20b would wait far past the deadline
+    res = pl.run(ctx)
+    assert "understand" not in fake.calls and "check" not in fake.calls, fake.calls
+    assert bud.run_sent == len(fake.calls) == 1 and not bud.inflight.get(SMALL), (bud.run_sent, fake.calls, bud.inflight)
+
+    # (d) a normal answer: three calls sent, three counted, nothing left in flight
+    b2 = budget()
+    fake = FakeGroq()
+    pl, ctx = pipeline(fake, b2), ctx_for()
+    res = pl.run(ctx)
+    assert res["kind"] == "answer" and b2.run_sent == 3 == len(fake.calls), (res["kind"], b2.run_sent)
+    assert not any(b2.inflight.get(m) for m in (SMALL, BIG)), b2.inflight
+    _ok("accounting, never sent: gave up in the limiter wait (x5), just before sending, or turned away (Busy) -> "
+        "run budget and limiter reservations given back; run_sent = requests sent (0, 0, 1; normal answer 3)")
+
+
 def main():
     """Run every test; exit 1 on the first failure."""
+    before = REAL.stat().st_mtime if REAL.exists() else None
     print(f"cancellation tests (offline, temp dir {TMP})")
     test_stream_cut()
     test_errors_not_cancel()
@@ -309,7 +406,10 @@ def main():
     test_cancel_before_delivery()
     test_normal()
     test_service()
-    print("all passed")
+    test_cut_accounting()
+    test_never_sent_releases()
+    assert (REAL.stat().st_mtime if REAL.exists() else None) == before, "real ledger was touched"
+    print("all passed; the real ledger was not touched")
 
 
 if __name__ == "__main__":

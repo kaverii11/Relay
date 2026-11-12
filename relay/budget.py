@@ -101,6 +101,17 @@ class Budget:
             self.run_sent += 1
             self.inflight.setdefault(model, []).append((time.monotonic(), est_in + est_out))
 
+    def release(self, model, est_in, est_out):
+        """A reserved call never reached the provider (cancelled while waiting, cancelled before sending, or turned
+        away by our limiter): undo reserve(), so it uses up neither the run's request cap nor in-flight headroom."""
+        with self.lock:
+            self.run_sent = max(0, self.run_sent - 1)
+            live = self.inflight.get(model, [])
+            for i in range(len(live) - 1, -1, -1):     # this call's own entry: the newest with its estimate
+                if live[i][1] == est_in + est_out:
+                    live.pop(i)
+                    break
+
     def record(self, model, tokens_in, tokens_out, status):
         """After a real call: append it to the ledger (locked, atomic) and release its in-flight reservation."""
         with self.lock:

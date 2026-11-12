@@ -233,17 +233,23 @@ class Pipeline:
                 ctx.draft_ready_ms = ctx.ms()
             if self.budget is not None:          # real-run caps (K §31), checked before anything is spent
                 self.budget.reserve(model, n_in, out_est)
-            wait, binding, ok = self.lim.acquire(model, n_in, out_est, max_wait)
-            if not ok:
-                if binding in ("rpd", "tpd"):
-                    raise DailyLimit(model, binding)
-                raise Busy(binding, wait)
-            # planned wait for the slot our limiter reserved; +50 ms because arriving exactly on the
-            # refill boundary still got a 429 in the smoke test (float edge, no network slack locally)
-            if kind == "draft":
-                with self.qlock:
-                    self.queued_drafts.discard(ctx.rid)    # its tokens now live in the limiter's buckets
-            ctx.sleep(wait + 0.05 if wait > 0 else 0, "waiting")
+            acquired = False
+            try:
+                wait, binding, ok = self.lim.acquire(model, n_in, out_est, max_wait)
+                if not ok:
+                    if binding in ("rpd", "tpd"):
+                        raise DailyLimit(model, binding)
+                    raise Busy(binding, wait)
+                acquired = True
+                # planned wait for the slot our limiter reserved; +50 ms because arriving exactly on the
+                # refill boundary still got a 429 in the smoke test (float edge, no network slack locally)
+                if kind == "draft":
+                    with self.qlock:
+                        self.queued_drafts.discard(ctx.rid)    # its tokens now live in the limiter's buckets
+                ctx.sleep(wait + 0.05 if wait > 0 else 0, "waiting")
+            except BaseException:                # never sent (turned away, or gave up while waiting): give it back
+                self._release(model, n_in, out_est, acquired)
+                raise
             ctx.limiter_wait_ms += wait * 1000
             if kind == "draft" and ctx.draft_sent_ms is None:
                 ctx.draft_sent_ms = ctx.ms()
@@ -260,10 +266,18 @@ class Pipeline:
                             max_tokens=self._max_tokens(kind), timeout_s=timeout,
                             client=self.http, extra=extra, cancel=ctx.cancel)
             # A stream cut by cancellation reports no usage, though the provider bills what it generated: keep the
-            # limiter's estimate (no refund) and count the estimate in the ledger. Cancelled before sending = nothing spent.
+            # limiter's reservation (no refund), log the estimate as spend for pacing, and count it in the ledger.
+            # Cancelled before sending (status 0): nothing reached the provider, so every reservation is given back.
             cut = r.error_kind == "cancelled" and r.status != 0
+            if r.error_kind == "cancelled" and not cut:
+                self._release(model, n_in, out_est, True)
+                ctx.calls -= 1
+                ctx.ev("call_end", step=kind, model=model, attempt=attempt, status=0, err="cancelled", sent=False)
+                raise Cancelled("before_call")
             self.lim.sync(model, r.headers)
-            if not cut:
+            if cut:
+                self.lim.note_spend(model, (r.tokens_in or n_in) + (r.tokens_out or out_est))
+            else:
                 self.lim.settle(model, out_est, r.tokens_out, r.tokens_in)   # actual_in: logs the spend for pacing
             if self.budget is not None:
                 self.budget.record(model, r.tokens_in or (n_in if cut else 0),
@@ -279,8 +293,8 @@ class Pipeline:
                    err=r.error_kind, limit=lk, first_any_ms=r.first_any_ms, ttft_ms=r.ttft_ms,
                    work_ms=round(r.total_ms, 1), tokens_in=r.tokens_in, tokens_out=r.tokens_out,
                    cached_tokens=r.cached_tokens, retry_after=r.headers.get("retry-after"))
-            if r.error_kind == "cancelled":           # never retried, never treated as a failure
-                raise Cancelled("stream" if cut else "before_call")
+            if cut:                                   # never retried, never treated as a failure
+                raise Cancelled("stream")
             if r.status == 200 and not r.error_kind:
                 return r
             # ---- failure: decide whether to retry
@@ -481,6 +495,14 @@ class Pipeline:
         finally:
             with self.qlock:
                 self.queued_drafts.discard(ctx.rid)
+
+    def _release(self, model, n_in, out_est, acquired):
+        """Undo the reservations of a call that never reached the provider: the run budget's (request cap +
+        in-flight tokens) and, if acquire() succeeded, the limiter's."""
+        if self.budget is not None:
+            self.budget.release(model, n_in, out_est)
+        if acquired:
+            self.lim.release(model, n_in, out_est)
 
     @staticmethod
     def _check_cancel(ctx, where):

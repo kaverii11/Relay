@@ -1512,11 +1512,22 @@ was still delivered as a success. A request that raised killed its worker thread
   So the limiter keeps its reservation (no refund) and the 24 h ledger records the estimate, not 0. Same principle as
   header sync (only ever more conservative): under-counting would cause 429s and could pass the ceiling. Cancelled
   before sending = nothing spent, settled as usual.
+- **Follow-up review (same day): two accounting gaps, fixed.** (1) The cut branch skipped `Limiter.settle()` to keep
+  the reservation, but settle() is also what logs spend for pacing, so a cut stream never reached the spend-rate
+  history and pacing (on by default) under-read recent spend. Now `Limiter.note_spend()` logs the estimate without
+  touching the buckets. (2) `Budget.reserve()` runs before the limiter wait; a person giving up during that wait (or
+  just before sending, or a limiter Busy / DailyLimit) left `run_sent` raised, so repeated give-ups could use up the
+  run's request cap with nothing sent (conservative, never overspending). Now any call that never reaches the
+  provider gives back its run-budget reservation (`Budget.release()`: run_sent - 1, its in-flight entry) and, if
+  acquired, its limiter reservation (`Limiter.release()`, the exact inverse of acquire), and writes no ledger entry.
+  Invariant tested: run_sent = requests that reached the provider. Neither path occurred in a measured run (the stand-in
+  runs have no run budget; the real runs had no limiter busy and no give-ups).
 - **Worker bookkeeping.** try/finally: timer cancelled and `pending` decremented always; an exception gives an error
   row, a `worker_error` event and a traceback on stderr (not swallowed), and the worker serves the next request.
 - Tests: `scripts/test_cancellation.py`, offline (fake model server, fake passages; no PDFs, no network): cancel before
   a call / mid-stream / after the check before delivery / not cancelled / HTTP and network errors stay errors /
-  service patience timer and a raising request. Against the old code, the mid-stream, before-delivery and service tests fail.
+  service patience timer and a raising request; plus the two accounting cases above. Against the code before each fix,
+  the mid-stream, before-delivery, service and both accounting tests fail.
 - Same pass, wording only: write-up ladder (250/3 skips the fewer-pieces rung, goes to 20b), Table 2a/2b phase labels
   "before / after 120b stops serving drafts" (always the 20 % reserve, not the quota used up), retry budget 10 % with a
   floor of 2, p50 3.2 s = answers only (n=8), 55 of the 60-question pool. Writing still 2 pages; verify 357/0.

@@ -129,11 +129,31 @@ class Limiter:
                 self.b[model][k]._refill()
                 self.b[model][k].used = max(0.0, self.b[model][k].used + actual_out - est_out)
             if actual_in is not None:
-                now = time.monotonic()
-                h = self.spend.setdefault(model, deque())
-                h.append((now, (actual_in or 0) + (actual_out or 0)))
-                while h and now - h[0][0] > SPEND_KEEP_S:
-                    h.popleft()
+                self._log_spend(model, (actual_in or 0) + (actual_out or 0))
+
+    def note_spend(self, model, tokens):
+        """Log spend for pacing WITHOUT touching the buckets: a stream cut by cancellation reports no usage, so its
+        reservation stays as it is (no refund) and its estimated cost still counts toward the recent spend rate."""
+        with self.lock:
+            self._log_spend(model, tokens)
+
+    def _log_spend(self, model, tokens):
+        """Append to the pacing spend history (caller holds the lock); drop entries older than SPEND_KEEP_S."""
+        now = time.monotonic()
+        h = self.spend.setdefault(model, deque())
+        h.append((now, tokens))
+        while h and now - h[0][0] > SPEND_KEEP_S:
+            h.popleft()
+
+    def release(self, model, tokens_in, tokens_out_est=0):
+        """Give back an acquire() reservation for a call that never reached the provider (cancelled while waiting or
+        before sending): the exact inverse of what acquire() added, floored at 0."""
+        with self.lock:
+            bb = self.b[model]
+            for k, r in {"rpm": 1, "rpd": 1, "itpm": tokens_in, "tpm": tokens_in + tokens_out_est,
+                         "tpd": tokens_in + tokens_out_est}.items():
+                bb[k]._refill()
+                bb[k].used = max(0.0, bb[k].used - r)
 
     def check_pacing(self, model: str, window_s: float, tolerance: float) -> tuple[bool, float, float]:
         """Spend-rate pacing (K, 2026-11-12; DECISIONS §4 "allowed rate = remaining / time until reset").
