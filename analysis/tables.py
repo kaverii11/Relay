@@ -187,7 +187,7 @@ def main(path):
         print(f"| {sc} ({src}) | {n / span:.2f} | {drafts / span:.2f} | {drafts / span / 2.5:.2f}x | "
               f"{100 * fresh_ref / n:.1f} | {100 * unv / n:.1f} | {100 * cache / n:.1f} | {100 * busy / n:.1f} |")
 
-    graded = [r for r in rows if r["answer_grade"]]
+    graded = [r for r in rows if r["answer_grade"] and r["scenario"] == "eval"]   # Table 3 = the eval only
     if graded:
         print("\nTable 3: retrieval settings (real Groq, graded rows only)")
         # answerable / unanswerable is a property of the QUESTION, not of a run: read from the question file
@@ -220,6 +220,35 @@ def main(path):
                   f"{wl[len(wl) // 2]:.0f} / {wl[-1]:.0f} (n={len(wl)}) |")
 
 
+FOLLOWUP_VERSION = {"w250_k3_rr0": "v1", "w250_k3_rr0_v2": "v2", "w250_k3_rr0_v2_pha": "v3"}
+DEV_CASES = ("Q80",)   # K §71: Q80 paraphrases the failure v3 was built on; reported apart
+
+
+def followup_rows(rows):
+    """Table 4 cells, one list per version (v1, v2, v3), from the graded follow-up run (scenario v1v2)."""
+    out = []
+    fu = [r for r in rows if r["scenario"] == "v1v2" and r["answer_grade"]]
+    for st, ver in FOLLOWUP_VERSION.items():
+        rs = [r for r in fu if r["retrieval_setting"] == st]
+        if not rs:
+            continue
+        n = len(rs)
+        cnt = lambda g, xs=rs: sum(r["answer_grade"] == g for r in xs)  # noqa: E731
+        held = [r for r in rs if r["request_id"] not in DEV_CASES]
+        dev = [f"{r['request_id']} {r['answer_grade'].replace('_', ' ')}" for r in rs if r["request_id"] in DEV_CASES]
+        toks = np.mean([int(r["tokens_in"]) + int(r["tokens_out"]) for r in rs])
+        dr = [int(r["tokens_in"]) + int(r["tokens_out"]) for r in rs if r["reply_kind"] == "answer"]
+        lw = [f(r.get("limiter_wait_ms")) or 0.0 for r in rs]
+        ft = pcts([None if f(r["first_token_ms"]) is None else f(r["first_token_ms"]) - w
+                   for r, w in zip(rs, lw) if not is_rejected(r)], (50, 95))
+        out.append([ver, str(n), f"{cnt('correct')} ({100 * cnt('correct') / n:.1f}%)", str(cnt("wrong")),
+                    str(cnt("refused_correctly")), str(cnt("refused_wrongly")),
+                    f"{cnt('correct', held)}/{len(held)}; {', '.join(dev) or '-'}",
+                    f"{toks:.0f} (n={n}); {np.mean(dr):.0f} (n={len(dr)})" if dr else f"{toks:.0f} (n={n}); n/a",
+                    ft])
+    return out
+
+
 def footnote():
     """The Table 3 footnote (n, noise, grading)."""
     print("\nTable 3: n = 20 questions per setting (13 answerable, 7 not), one run each, graded by hand from a blinded "
@@ -236,6 +265,20 @@ def footnote():
           "(n=8, incl. 2 redrafts), split pre-draft 0.8 / draft 1.8 / check 0.6 s (DECISIONS §37); not a direct measurement.")
 
 
+def print_followup(path):
+    """Table 4: v1 / v2 / v3 on the 20 follow-up questions (real Groq, graded rows)."""
+    fr = followup_rows(list(csv.DictReader(open(path))))
+    if not fr:
+        return
+    print("\nTable 4: v1 / v2 / v3 on the 20 follow-up questions (real Groq, graded)")
+    print("| Version | Questions | Correct | Wrong | Refused correctly | Refused wrongly | Correct without the "
+          "development case; that case | Tokens per question; per drafted answer | First token p50 / p95 (ms) |")
+    print("|---|---|---|---|---|---|---|---|---|")
+    for c in fr:
+        print("| " + " | ".join(c) + " |")
+
+
 if __name__ == "__main__":
     main(sys.argv[1] if len(sys.argv) > 1 else "results.csv")
+    print_followup(sys.argv[1] if len(sys.argv) > 1 else "results.csv")
     footnote()

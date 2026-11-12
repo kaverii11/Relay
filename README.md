@@ -38,9 +38,15 @@ the checker passed it) became v3, kept as a separate arm so v2 vs v1 and v3 vs v
 `author` column names who wrote each): 12 by Kaveri (table questions where the header sits in another piece,
 plain-text questions that name no table or paper, a false premise, and two unanswerable traps) and 8 by Claude Code
 at her request (three header-split questions, one shared-vocabulary question that tests v3's paper hint, and four
-easy baseline facts). Every expected answer was checked against the rendered PDF pages. They were graded blind
-(arms hidden, `eval/blind_reading.py`) by Claude Code at Kaveri's request, an exception to her no-LLM-judge rule
-for the eval (§67), and re-checked by her. Table 3's eval answers (her 20 held-out questions) were graded by her.
+easy baseline facts). Every expected answer was checked against the rendered PDF pages. They were graded by Claude
+Code at Kaveri's request (arms hidden, `eval/blind_reading.py`; not fully blind: the grader had seen the run's
+console log of reply kinds), an exception to her no-LLM-judge rule for the eval (§67); her re-check is pending.
+Table 3's eval answers (her 20 held-out questions) were graded by her.
+
+**Result** (run `v1v2_20261112_133034`, 12 Nov 13:30-13:58 IST; Table 4 of the write-up; DECISIONS §73): correct
+9 / 8 / 8 of 20 for v1 / v2 / v3, wrong 7 / 7 / 5, refused wrongly 3 / 4 / 6; tokens per question 2992 / 3511 /
+3718. Neither fix beat v1 (one question = 5 points). Q80, the development case, was wrong in all three: v3's
+drafter had Transformer §5.3 in its pieces and still chose Helium's schedule. v1 stays the system.
 
 ## Setup
 
@@ -67,11 +73,11 @@ Stand-in: `.venv/bin/uvicorn standin.server:app --port 8099`.
 
 ## Recompute every table from results.csv
 
-`results.csv` is the single raw file behind Tables 2a, 2b and 3 (1,237 rows: 9 stand-in load runs, the real
-evening end-to-end set, the real eval). One row per request; columns in `relay/service.py` `COLUMNS`.
+`results.csv` is the single raw file behind Tables 2a, 2b and 3 (1,297 rows: 9 stand-in load runs, the real
+evening end-to-end set, the real eval, the real v1 / v2 / v3 follow-up run). One row per request; columns in `relay/service.py` `COLUMNS`.
 
 ```sh
-.venv/bin/python analysis/tables.py results.csv                 # Tables 2a, 2b, 3 + the load-mix table + footnotes
+.venv/bin/python analysis/tables.py results.csv                 # Tables 2a, 2b, 3, 4 + the load-mix table + footnotes
 .venv/bin/python analysis/run_all_summary.py raw/run_all_20261110.txt   # one line per load scenario
 .venv/bin/python eval/eval_breakdown.py eval_day1_20261111_124523       # per question x setting; code/model check vs grade
 .venv/bin/python eval/check_vs_grade.py eval_day1_20261111_124523       # code-only vs code + model check (§8)
@@ -87,7 +93,7 @@ evening end-to-end set, the real eval). One row per request; columns in `relay/s
   raw/results_daily_exhausted_afternoon_20261111_015059.csv raw/results_burst_evening_20261111_021009.csv \
   raw/results_overload_evening_20261111_022927.csv raw/results_overload_shadow_afternoon_20261111_025926.csv \
   raw/results_minute_limit_halved_nolearn_afternoon_20261111_032925.csv raw/results_e2e_evening_20261110_221128.csv \
-  raw/results_eval_day1_20261111_124523.csv
+  raw/results_eval_day1_20261111_124523.csv raw/results_v1v2_20261112_133034.csv
 ```
 
 Table 1 (limits of the real service) comes from the probe logs, not from `results.csv`: `probe/FINDINGS.md`,

@@ -14,7 +14,9 @@ table { border-collapse: collapse; font-size: 8.5pt !important; } td, th { borde
 code { font-size: 9pt !important; word-break: break-all; }
 @page land { size: A4 landscape; margin: 0.5in; }
 .results { page: land; break-before: page; }
-.results table { width: 100%; font-size: 8pt !important; }
+.results table { width: 100%; font-size: 7.5pt !important; line-height: 1.1 !important; }
+.results td, .results th { padding: 1px 3px; }
+.results p, .results li { font-size: 8.5pt !important; }
 .tbl { break-inside: avoid; break-before: page; }
 .tbl:first-of-type { break-before: auto; }
 table, tr, thead { break-inside: avoid; }

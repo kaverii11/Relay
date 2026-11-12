@@ -19,12 +19,13 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from analysis.tables import f, is_rejected, paid_cost, pcts, peak_queue, served  # noqa: E402
+from analysis.tables import FOLLOWUP_VERSION, f, followup_rows, is_rejected, paid_cost, pcts, peak_queue, served  # noqa: E402
 
 FILES = ["steady_afternoon_20261110_233137", "burst_afternoon_20261111_003145", "overload_afternoon_20261111_005059",
          "minute_limit_halved_afternoon_20261111_012058", "daily_exhausted_afternoon_20261111_015059",
          "burst_evening_20261111_021009", "overload_evening_20261111_022927", "overload_shadow_afternoon_20261111_025926",
-         "minute_limit_halved_nolearn_afternoon_20261111_032925", "e2e_evening_20261110_221128", "eval_day1_20261111_124523"]
+         "minute_limit_halved_nolearn_afternoon_20261111_032925", "e2e_evening_20261110_221128", "eval_day1_20261111_124523",
+         "v1v2_20261112_133034"]   # the follow-up v1 / v2 / v3 run (K §66), graded by CC (K §67)
 SET = {"w250_k6_rr1": "250/6 re-rank", "w250_k6_rr0": "250/6 BM25", "w250_k3_rr0": "250/3 BM25"}
 
 
@@ -41,6 +42,8 @@ def label(r):
         sc = f"eval, {SET[r['retrieval_setting']]}"
     if r["scenario"] == "e2e":
         sc = "e2e evening set"
+    if r["scenario"] == "v1v2":
+        sc = f"follow-up, {FOLLOWUP_VERSION[r['retrieval_setting']]}"
     prof = "real Groq" if r["source"] == "groq" else ("stand-in, evening" if "evening" in r["standin_profile"] else "stand-in, afternoon")
     return sc, prof
 
@@ -160,6 +163,21 @@ def main():
         if rw:
             idx = ["w250_k6_rr1", "w250_k6_rr0", "w250_k3_rr0"].index(st)
             cmp(f"3 {st} refused wrongly (note)", rw.group(idx + 1), pc("refused_wrongly"))
+    # Table 4 (follow-up v1 / v2 / v3): every cell against analysis/tables.followup_rows, plus the grade counts
+    # recomputed here independently from the rows
+    want4 = {c[0]: c for c in followup_rows(rows)}
+    for row in (table_rows(md, "### Table 4") if "### Table 4" in md else []):
+        ver = row[0].replace("**", "")
+        if ver not in want4:
+            bad.append(f"4: unknown version row {row[0]!r}")
+            continue
+        for i, (g, w) in enumerate(zip(row, want4[ver])):
+            cmp(f"4 {ver} col {i}", g, w)
+        st = {v: k for k, v in FOLLOWUP_VERSION.items()}[ver]
+        rs = [r for r in rows if r["scenario"] == "v1v2" and r["retrieval_setting"] == st]
+        for i, gname in ((3, "wrong"), (4, "refused_correctly"), (5, "refused_wrongly")):
+            cmp(f"4 {ver} {gname} (independent)", row[i], str(sum(r["answer_grade"] == gname for r in rs)))
+        cmp(f"4 {ver} correct (independent)", row[2].split(" ")[0], str(sum(r["answer_grade"] == "correct" for r in rs)))
     print(f"cells checked: {n_cells}; mismatches: {len(bad)}")
     for b in bad:
         print("  MISMATCH", b)
