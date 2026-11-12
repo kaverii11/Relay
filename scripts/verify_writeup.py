@@ -19,7 +19,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from analysis.tables import FOLLOWUP_VERSION, f, followup_rows, is_rejected, paid_cost, pcts, peak_queue, served  # noqa: E402
+from analysis.tables import FOLLOWUP_VERSION, base_id, f, followup_rows, is_rejected, paid_cost, pcts, peak_queue, served  # noqa: E402
 
 FILES = ["steady_afternoon_20261110_233137", "burst_afternoon_20261111_003145", "overload_afternoon_20261111_005059",
          "minute_limit_halved_afternoon_20261111_012058", "daily_exhausted_afternoon_20261111_015059",
@@ -143,7 +143,7 @@ def main():
         rs = [r for r in ev if r["retrieval_setting"] == st]
         n = len(rs)
         pc = lambda g: f"{100 * sum(r['answer_grade'] == g for r in rs) / n:.1f}"  # noqa: E731
-        na = [r for r in rs if qf[r["request_id"]]]
+        na = [r for r in rs if qf[base_id(r["request_id"])]]
         coa = f"{sum(r['answer_grade'] == 'correct' for r in na)}/{len(na)}"
         dr = [int(r["tokens_in"]) + int(r["tokens_out"]) for r in rs if r["reply_kind"] == "answer"]
         tq = np.mean([int(r["tokens_in"]) + int(r["tokens_out"]) for r in rs])

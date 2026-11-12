@@ -25,6 +25,7 @@ sys.path.insert(0, str(ROOT))
 from relay.config import SETTINGS  # noqa: E402
 from relay.prompts import claim_quotes  # noqa: E402
 from relay.textnorm import MIN_QUOTE_KEY, match_key  # noqa: E402
+from analysis.tables import base_id  # noqa: E402
 
 SHORT = {"medium_rerank": "250/6 re-rank", "medium_norerank": "250/6 no re-rank", "medium_k3_norerank": "250/3 no re-rank"}
 G = {"correct": "correct", "wrong": "WRONG", "refused_correctly": "ref. ok", "refused_wrongly": "REF. WRONG"}
@@ -41,7 +42,7 @@ def main():
     key = json.loads((ROOT / f"raw/blind_key_{run}.json").read_text())["key"]
     bid = {(v["question"], v["setting"]): b for b, v in key.items()}
     notes = json.loads((ROOT / f"raw/grades_{run}.json").read_text())
-    cell = {(r["request_id"], name_of[r["retrieval_setting"]]): r for r in rows}
+    cell = {(base_id(r["request_id"]), name_of[r["retrieval_setting"]]): r for r in rows}
     L = [f"# Eval breakdown, {run} (results.csv + event logs + K's grades)", "",
          "## Per question across the three settings", "",
          "| question | type | answerable | " + " | ".join(SHORT[n] for n in names) + " | changed with setting |",

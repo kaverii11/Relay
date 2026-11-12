@@ -213,11 +213,16 @@ def main(path):
             ft = pcts([None if f(r["first_token_ms"]) is None else f(r["first_token_ms"]) - w for r, w in rw], (50, 95))
             tot = pcts([f(r["total_ms"]) - w if r["status"] == "ok" else None for r, w in rw], (50, 95))
             wl = sorted(lw)
-            na = [r for r in rs if ans_of.get(r["request_id"])]
+            na = [r for r in rs if ans_of.get(base_id(r["request_id"]))]
             coa = f"{sum(r['answer_grade'] == 'correct' for r in na)}/{len(na)}" if ans_of else "not measured"
             print(f"| {st} | {n} | {pc('correct'):.1f} | {coa} | {pc('wrong'):.1f} | {pc('refused_correctly'):.1f} | "
                   f"{pc('refused_wrongly'):.1f} | {toks:.0f} (n={n}) | {tda} | {ft} | {tot} | "
                   f"{wl[len(wl) // 2]:.0f} / {wl[-1]:.0f} (n={len(wl)}) |")
+
+
+def base_id(rid):
+    """request_id without the uniqueness suffix scripts/assemble_results.py adds ("Q63@w250_k3_rr0_v2" -> "Q63")."""
+    return rid.split("@", 1)[0]
 
 
 FOLLOWUP_VERSION = {"w250_k3_rr0": "v1", "w250_k3_rr0_v2": "v2", "w250_k3_rr0_v2_pha": "v3"}
@@ -234,8 +239,8 @@ def followup_rows(rows):
             continue
         n = len(rs)
         cnt = lambda g, xs=rs: sum(r["answer_grade"] == g for r in xs)  # noqa: E731
-        held = [r for r in rs if r["request_id"] not in DEV_CASES]
-        dev = [f"{r['request_id']} {r['answer_grade'].replace('_', ' ')}" for r in rs if r["request_id"] in DEV_CASES]
+        held = [r for r in rs if base_id(r["request_id"]) not in DEV_CASES]
+        dev = [f"{base_id(r['request_id'])} {r['answer_grade'].replace('_', ' ')}" for r in rs if base_id(r["request_id"]) in DEV_CASES]
         toks = np.mean([int(r["tokens_in"]) + int(r["tokens_out"]) for r in rs])
         dr = [int(r["tokens_in"]) + int(r["tokens_out"]) for r in rs if r["reply_kind"] == "answer"]
         lw = [f(r.get("limiter_wait_ms")) or 0.0 for r in rs]

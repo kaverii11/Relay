@@ -74,7 +74,7 @@ Stand-in: `.venv/bin/uvicorn standin.server:app --port 8099`.
 ## Recompute every table from results.csv
 
 `results.csv` is the single raw file behind Tables 2a, 2b and 3 (1,297 rows: 9 stand-in load runs, the real
-evening end-to-end set, the real eval, the real v1 / v2 / v3 follow-up run). One row per request; columns in `relay/service.py` `COLUMNS`.
+evening end-to-end set, the real eval, the real v1 / v2 / v3 follow-up run). One row per request; columns in `relay/service.py` `COLUMNS`. `request_id` is unique: where repeated runs reused their numbering, it carries `@` and what tells the rows apart (run variant, stand-in profile or retrieval setting), e.g. `Q63@w250_k3_rr0_v2`; `source` is `real` or `stand-in`.
 
 ```sh
 .venv/bin/python analysis/tables.py results.csv                 # Tables 2a, 2b, 3, 4 + the load-mix table + footnotes
