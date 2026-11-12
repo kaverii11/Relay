@@ -86,6 +86,7 @@ def main():
     ap.add_argument("--tag", default="")
     ap.add_argument("--arrival-check", default="on", choices=["on", "shadow", "off"])
     ap.add_argument("--no-learn", action="store_true", help="don't learn lower limits from 429 bodies")
+    ap.add_argument("--pacing", action="store_true", help="spend-rate pacing on (K §72); off = the measured 20 %% reserve")
     ap.add_argument("--smoke", action="store_true",
                     help="old CC-written pool sampled with replacement, draft_share from --draft-share (default 1)")
     ap.add_argument("--draft-share", type=float, default=None, help="override load/mix.json (smoke only)")
@@ -130,7 +131,8 @@ def main():
     for ex in sc.get("exhaust", []):
         httpx.post(admin + "/exhaust", json=ex).raise_for_status()
 
-    pol = Policy(retry_jitter=a.jitter, arrival_check=a.arrival_check, learn_limits=not a.no_learn)
+    # pacing off unless --pacing (K §72): Tables 2a/2b were measured with the 20 % reserve
+    pol = Policy(retry_jitter=a.jitter, arrival_check=a.arrival_check, learn_limits=not a.no_learn, pacing_enabled=a.pacing)
     if a.max_retries is not None:
         pol.max_retries_per_question = a.max_retries
     if a.no_retry_budget:

@@ -128,13 +128,14 @@ sends nothing) and `--go`; each `--go` was approved by K after its plan.
 ## Guardrails (security, scale, tokens)
 
 What protects the key, the daily budget and the service, and how each one is tested.
-`.venv/bin/python scripts/test_guardrails.py` runs offline: no tokens, and the real ledger is never touched.
+`scripts/test_guardrails.py` and `scripts/test_pacing.py` run offline: no tokens, and the real ledger is never touched.
 
 | Risk | Guardrail | Where |
 |---|---|---|
 | Key leaks | key only in `.env` (gitignored); org id redacted from logs; `check_secrets.sh` before upload | `scripts/` |
 | One question costs too much | output caps per call (draft 800, others 400); at most 1 redraft and 2 retries; cache first | `pipeline.py` |
-| The day runs out | 170k-of-200k ceiling per model over a rolling 24 h, checked **before** each call, counting calls still in flight; 20 % reserve switches drafts to 20b | `budget.py`, `pipeline.py` |
+| The day runs out | 170k-of-200k ceiling per model over a rolling 24 h, checked **before** each call, counting calls still in flight | `budget.py` |
+| 120b's day goes in the first hour | spend-rate pacing: 120b skipped while its last-5-min spend is > 15 % over (tokens left today ÷ 86,400 s), plus a 5 % hard floor; `pacing_enabled=False` = the measured 20 % reserve. Measured runs pin it off; `analysis/pacing_sim.py` compares both over 24 h (DECISIONS §72) | `limiter.py`, `pipeline.py`, `config.py` |
 | Two processes or a crash corrupt the count | ledger locked across processes, written atomically; an unreadable ledger refuses spending (fail closed) | `ledger.py` |
 | Hostile or huge input | control characters stripped; empty or > 1,000 characters gets a fixed reply with no model call | `guard.py` |
 | Prompt injection | every claim must quote a passage word for word (code check) and pass the 20b check; the worst outcome is a refusal or "couldn't verify", never an unchecked answer | `pipeline.py` |
@@ -156,7 +157,7 @@ an API gateway. Neither is built: today the service is a library driven by scrip
 | `analysis/` | tables and summaries, from raw files only |
 | `probe/` | real-service probe script, findings, raw logs |
 | `raw/` | every run's results, event logs (one JSON line per request with every step), meta files, reading files |
-| `scripts/` | `ask.py` (one question), `assemble_results.py`, `relabel_from_events.py`, `verify_writeup.py`, `check_numbers.py`, `render_writeup.sh`, `package.sh` (builds the Drive folder), `redact_org.py`, `check_secrets.sh`, `test_guardrails.py` (offline guardrail tests) |
+| `scripts/` | `ask.py` (one question), `assemble_results.py`, `relabel_from_events.py`, `verify_writeup.py`, `check_numbers.py`, `render_writeup.sh`, `package.sh` (builds the Drive folder), `redact_org.py`, `check_secrets.sh`, `test_guardrails.py`, `test_pacing.py` (offline tests, no tokens) |
 | `library/` | `fetch_papers.py`: the three PDFs at their pinned versions |
 
 The Groq key lives only in `.env` (not committed, not in the submission). `scripts/redact_org.py` replaced the

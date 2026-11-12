@@ -44,9 +44,10 @@ from relay.pipeline import Pipeline  # noqa: E402
 from relay.retrieval import Retriever, cross_encoder  # noqa: E402
 from relay.service import Service, write_csv  # noqa: E402
 
-ARMS = {"chosen": Policy,                                                                          # v1
-        "chosen_v2": lambda: Policy(check_prompt="v2", draft_prompt="v2"),                         # v2 = a + b
-        "chosen_v3a": lambda: Policy(check_prompt="v2", draft_prompt="v2", sticky_check_fail=True)}  # v3 = a-d (K §66)
+ARMS = {"chosen": lambda: Policy(pacing_enabled=False),                                            # v1
+        "chosen_v2": lambda: Policy(check_prompt="v2", draft_prompt="v2", pacing_enabled=False),                         # v2 = a + b
+        "chosen_v3a": lambda: Policy(check_prompt="v2", draft_prompt="v2", sticky_check_fail=True, pacing_enabled=False)}  # v3 = a-d (K §66)
+# every arm pinned to pacing off (K §72): the run compares v1 / v2 / v3 on 120b drafts, as the eval was measured
 
 
 def load_new(path):

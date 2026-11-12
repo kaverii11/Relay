@@ -40,8 +40,10 @@ def main():
     real = a.base_url is None
     setting = SETTINGS[a.setting]
     # each arm's Policy, as eval/run_v1v2.py runs them: v2 = new check + draft prompts; v3 = v2 + sticky check failure
-    pol = (Policy(check_prompt="v2", draft_prompt="v2", sticky_check_fail=True) if a.setting.startswith("chosen_v3")
-           else Policy(check_prompt="v2", draft_prompt="v2") if a.setting == "chosen_v2" else Policy())
+    # pacing off (K §72): one question can't be paced meaningfully, and it should match the arms as measured
+    pol = (Policy(check_prompt="v2", draft_prompt="v2", sticky_check_fail=True, pacing_enabled=False) if a.setting.startswith("chosen_v3")
+           else Policy(check_prompt="v2", draft_prompt="v2", pacing_enabled=False) if a.setting == "chosen_v2"
+           else Policy(pacing_enabled=False))
     ret = Retriever(setting)
     cross_encoder()
     hits, gate, _ = ret.search(a.question)

@@ -260,7 +260,7 @@ class Pipeline:
                             max_tokens=self._max_tokens(kind), timeout_s=timeout,
                             client=self.http, extra=extra)
             self.lim.sync(model, r.headers)
-            self.lim.settle(model, out_est, r.tokens_out)
+            self.lim.settle(model, out_est, r.tokens_out, r.tokens_in)   # actual_in: logs the spend for pacing
             if self.budget is not None:
                 self.budget.record(model, r.tokens_in, r.tokens_out, r.status)
             ctx.tokens_in += r.tokens_in
@@ -312,7 +312,11 @@ class Pipeline:
                "citations": [], "query": None}
         # K §44 (Table 2a/2b column): at arrival, is the 120b day budget still serving drafts?
         ctx.daily_phase = ("after" if self.daily_hit is not None
-                           or self.lim.daily_fraction_left(BIG) < self.p.daily_reserve_fraction else "before")
+                           or self.lim.daily_fraction_left(BIG) < self._reserve_fraction() else "before")
+        if self.p.pacing_enabled:            # K §72: is pacing regulating 120b for this arrival?
+            _, why, cur, allowed = self._big_blocked()
+            ctx.ev("pacing", regulating=why == "daily_pacing", hard_reserve=why == "daily_reserve",
+                   current_tps=round(cur, 2), allowed_tps=None if math.isinf(allowed) else round(allowed, 2))
         # input guardrail (relay/guard.py): before the cache, retrieval or any model call
         ctx.question, bad = check_question(ctx.question)
         if bad:
@@ -478,8 +482,9 @@ class Pipeline:
             ahead = len(self.queued_drafts - {ctx.rid})
         k_full = self.setting.k
         best = None
+        big_blocked = self._big_blocked()[0]         # same rule as _plan_draft, so the prediction matches the ladder
         for model, k, level in self._rungs():
-            if model == BIG and self.lim.daily_fraction_left(BIG) < self.p.daily_reserve_fraction:
+            if model == BIG and big_blocked:
                 continue
             ahead_tok = ahead * self.draft_est(k_full) if model == BIG else 0.0
             wait, binding = self.lim.peek_wait(model, self.draft_est(k), DRAFT_OUT_EST, ahead_tok)
@@ -532,9 +537,13 @@ class Pipeline:
 
     def _plan_draft(self, ctx, query, hits):
         """First ladder rung (model, pieces) whose draft can still finish before the deadline; None = busy."""
+        blocked, why, cur, allowed = self._big_blocked()
         for model, k, level in self._rungs():
-            if model == BIG and self.lim.daily_fraction_left(BIG) < self.p.daily_reserve_fraction:
-                ctx.ev("ladder_skip", rung=level, why="daily_reserve")
+            if model == BIG and blocked:
+                if why == "daily_pacing":
+                    ctx.ev("ladder_skip", rung=level, why=why, current_tps=round(cur, 2), allowed_tps=round(allowed, 2))
+                else:
+                    ctx.ev("ladder_skip", rung=level, why=why)
                 continue
             n_in = est_tokens(draft_messages(ctx.question, hits[:k], variant=self.p.draft_prompt))
             wait, binding = self.lim.predict_wait_s(model, n_in, DRAFT_OUT_EST)
@@ -545,6 +554,22 @@ class Pipeline:
                 ctx.ev("ladder", rung=level, model=model, k=k, predicted_wait_s=round(wait, 2))
                 return model, k, level
         return None
+
+    def _reserve_fraction(self):
+        """Share of the 120b day below which 120b never drafts: the hard floor with pacing, else the 20 % reserve."""
+        return self.p.hard_reserve_fraction if self.p.pacing_enabled else self.p.daily_reserve_fraction
+
+    def _big_blocked(self):
+        """Should the 120b rungs be skipped now? (blocked, why, current_tps, allowed_tps).
+        Pacing off: the old rule, below daily_reserve_fraction (why "daily_reserve").
+        Pacing on: below hard_reserve_fraction ("daily_reserve"), else when the recent spend rate is over the
+        allowed rate by more than the tolerance ("daily_pacing"); see Limiter.check_pacing."""
+        if self.lim.daily_fraction_left(BIG) < self._reserve_fraction():
+            return True, "daily_reserve", 0.0, 0.0
+        if not self.p.pacing_enabled:
+            return False, "", 0.0, math.inf
+        over, cur, allowed = self.lim.check_pacing(BIG, self.p.pacing_window_s, self.p.pacing_tolerance)
+        return over, ("daily_pacing" if over else ""), cur, allowed
 
     def _busy_eta(self, ctx, query, hits):
         """Shortest predicted wait over both models, and the limit that binds: the busy reply's ETA."""

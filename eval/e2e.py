@@ -162,7 +162,7 @@ def main():
     ap.add_argument("--base-url", default=None, help="stand-in URL for a dry run (no ledger, no caps)")
     a = ap.parse_args()
     real = a.base_url is None
-    setting, pol = SETTINGS[a.setting], Policy()
+    setting, pol = SETTINGS[a.setting], Policy(pacing_enabled=False)   # as measured (K §72)
     pool = load_pool()
     rw = load_rewrites()
     stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")

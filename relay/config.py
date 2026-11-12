@@ -86,6 +86,15 @@ class Policy:
                                            # uncut v2 check reply (314 of 39; one reply hit the old 400 cap)
     # --- degradation + budget (DECISIONS §2, §4)
     daily_reserve_fraction: float = 0.20   # PLACEHOLDER: K wants burst-sized reserve after the burst scenario
+                                           # (used only when pacing_enabled is False: the measured behaviour)
+    # --- spend-rate pacing (K, 2026-11-12; DECISIONS §4, §72): replaces the 20 % cliff with a regulator.
+    # 120b is skipped when its spend over the last pacing_window_s runs above
+    # (tokens left today / seconds until the day bucket is full again) x (1 + pacing_tolerance),
+    # and always below hard_reserve_fraction of the day. Values are K's, not yet measured on a load run.
+    pacing_enabled: bool = True
+    pacing_tolerance: float = 0.15
+    pacing_window_s: float = 300.0
+    hard_reserve_fraction: float = 0.05
     workers: int = 16                      # our own concurrency; arrivals beyond this queue
     reasoning_effort: str = "low"          # K §15
     cache: bool = True

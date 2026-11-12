@@ -141,7 +141,7 @@ def main():
     bad = [s for s in names if s not in SETTINGS]
     if bad:
         raise SystemExit(f"unknown settings {bad}; add them to relay/config.py SETTINGS first")
-    pol = Policy()
+    pol = Policy(pacing_enabled=False)      # as measured (K §72)
     pool = {p["id"]: p for p in load_pool()}
     order = order_ids(pool.values(), a.seed)
     rotation = setting_rotation(names, order, a.seed)       # by position in the full order: day 2 keeps day 1's rotation
